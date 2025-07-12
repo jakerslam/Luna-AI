@@ -13,8 +13,11 @@
     --button-hover-bg: #005ecb;
     --shadow: rgba(0, 0, 0, 0.1);
     --header-text: #222;
-    --error-text: #ff0000; /* Red for errors in light mode */
-    --thinking-color: #222; /* Dots color in light mode */
+    --error-text: #ff0000;
+    --thinking-color: #222;
+    --status-offline: #ff0000; /* Red for offline (light mode) */
+    --status-online: #28a745; /* Green for online/used (light mode) */
+    --status-default: #888; /* Gray for default (light mode) */
 }
 
 [data-theme="dark"] {
@@ -31,8 +34,11 @@
     --button-hover-bg: #4682b4;
     --shadow: rgba(0, 0, 0, 0.5);
     --header-text: #e0e0e0;
-    --error-text: #ff5555; /* Lighter red for errors in dark mode */
-    --thinking-color: #e0e0e0; /* Dots color in dark mode */
+    --error-text: #ff5555;
+    --thinking-color: #e0e0e0;
+    --status-offline: #ff5555; /* Red for offline (dark mode) */
+    --status-online: #34c759; /* Green for online/used (dark mode) */
+    --status-default: #666; /* Gray for default (dark mode) */
 }
 
 /* Reset & Base */
@@ -43,7 +49,7 @@
 }
 
 html, body {
-    height: 100%; /* Ensure full viewport height */
+    height: 100%;
     font-family: 'Segoe UI', sans-serif;
     background: var(--background);
     display: flex;
@@ -54,9 +60,9 @@ html, body {
 
 /* Chat Container */
 .chat-wrapper {
-    width: 800px; /* Fixed width for desktop */
-    max-width: 800px;
-    min-width: 600px; /* Prevent shrinking when empty */
+    width: min(800px, 95vw);
+    max-width: 100%;
+    min-width: 600px;
     height: 80vh;
     background: var(--chat-bg);
     border-radius: 16px;
@@ -64,7 +70,7 @@ html, body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transition: background 0.3s ease, box-shadow 0.3s ease;
+    transition: background 0.3s ease, box-shadow 0.3s ease, width 0.3s ease;
 }
 
 /* Chat Header */
@@ -162,13 +168,105 @@ input:not(:checked) + .slider::after {
     justify-content: flex-end;
     max-height: calc(80vh - 110px);
     box-sizing: border-box;
-    background: var(--chat-bg); /* Ensure chat container follows theme */
+    background: var(--chat-bg);
+    border-bottom: 1px solid var(--input-border); /* Reintroduced border */
+    transition: background 0.3s ease, border-bottom 0.3s ease;
+}
+
+/* Input Container */
+#input-container {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    padding: 15px;
+    background: var(--input-bg);
+    gap: 10px;
+    flex-shrink: 0;
     transition: background 0.3s ease;
-    position: relative; /* For positioning thinking indicator */
+}
+
+/* Status Button Container */
+#status-button-container {
+    display: flex;
+    justify-content: center; /* Center the status button */
+    padding: 10px 15px;
+    background: var(--input-bg);
+    flex-shrink: 0;
+    transition: background 0.3s ease;
+}
+
+/* AI Status Container */
+#ai-status-container {
+    display: inline-flex; /* Fit content tightly */
+    justify-content: flex-start;
+    align-items: center;
+    gap: 24px;
+    padding: 6px 12px; /* Reduced padding for compact look */
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 18px; /* Pill shape: half of height (36px / 2) */
+    flex-shrink: 0;
+    transition: background 0.3s ease, border 0.3s ease;
+}
+
+.ai-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ai-icon {
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--bot-text);
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.3s ease;
+}
+
+.ai-icon.grok {
+    background: #1e90ff;
+}
+
+.ai-icon.gemini {
+    background: #34c759;
+}
+
+.ai-icon.openai {
+    background: #10a37f;
+}
+
+.status-squares {
+    display: flex;
+    flex-direction: column-reverse; /* Bottom to top */
+    justify-content: space-between;
+    height: 24px;
+}
+
+.status-square {
+    width: 6px;
+    height: 6px;
+    background: var(--status-default); /* Default to gray */
+    border-radius: 2px;
+    transition: background 0.3s ease;
+}
+
+.status-square.offline {
+    background: var(--status-offline); /* Red for offline */
+}
+
+.status-square.online {
+    background: var(--status-online); /* Green for online/used */
 }
 
 #filler {
-    flex-grow: 1; /* Push messages downward */
+    flex-grow: 1;
 }
 
 #bottom-spacer {
@@ -176,7 +274,7 @@ input:not(:checked) + .slider::after {
     visibility: hidden;
 }
 
-/* Thinking Indicator (Three-Dot Worm Animation) */
+/* Thinking Indicator */
 #thinking-indicator {
     display: none;
     position: absolute;
@@ -265,30 +363,20 @@ input:not(:checked) + .slider::after {
 
 .bot.error .bubble {
     color: var(--error-text);
-    font-size: 14.4px; /* 90% of 16px */
+    font-size: 14.4px;
 }
 
 /* Input Section */
-#input-container {
-    display: flex;
-    padding: 15px;
-    border-top: 1px solid var(--input-border);
-    background: var(--input-bg);
-    gap: 10px;
-    flex-shrink: 0;
-    transition: background 0.3s ease, border-top 0.3s ease;
-}
-
 #user-input {
     flex: 1;
     padding: 12px 15px;
     font-size: 16px;
-    border: 1px solid var(--input-border);
+    border: none; /* Removed border */
     border-radius: 8px;
     outline: none;
     background: var(--input-bg);
     color: var(--bot-text);
-    transition: background 0.3s ease, color 0.3s ease, border 0.3s ease;
+    transition: background 0.3s ease, color 0.3s ease;
 }
 
 #action-button {
@@ -302,6 +390,7 @@ input:not(:checked) + .slider::after {
     align-items: center;
     justify-content: center;
     transition: background 0.3s ease;
+    flex-shrink: 0;
 }
 
 #action-button:hover {
@@ -315,15 +404,15 @@ input:not(:checked) + .slider::after {
 
 /* Theme Transition */
 .theme-transition, .theme-transition * {
-    transition: background 0.3s ease, color 0.3s ease, border 0.3s ease, box-shadow 0.3s ease !important;
+    transition: background 0.3s ease, color 0.3s ease, border 0.3s ease, box-shadow 0.3s ease, width 0.3s ease !important;
 }
 
 /* Mobile Responsive */
 @media (max-width: 640px) {
     .chat-wrapper {
         width: 95%;
-        min-width: unset; /* Allow mobile to shrink */
-        height: 90vh;
+        min-width: unset;
+        max-width: 100%;
     }
 
     #chat-container {
@@ -333,5 +422,11 @@ input:not(:checked) + .slider::after {
     #thinking-indicator {
         left: 10px;
         bottom: 8px;
+    }
+
+    #ai-status-container {
+        gap: 18px;
+        padding: 6px 10px;
+        border-radius: 16px; /* Adjusted for smaller height */
     }
 }

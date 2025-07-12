@@ -1,36 +1,64 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Luna Chatbot</title>
+    <title>Luna AI</title>
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
     <div class="chat-wrapper">
         <div class="chat-header">
-            <h1>Luna</h1>
+            <h1>Luna AI</h1>
             <label class="dark-mode-toggle">
-                <input type="checkbox" id="dark-mode-toggle" aria-label="Toggle dark mode">
+                <input type="checkbox" id="dark-mode-toggle">
                 <span class="slider"></span>
             </label>
         </div>
         <div id="chat-container">
             <div id="filler"></div>
+            <div id="bottom-spacer"></div>
             <div id="thinking-indicator">
                 <span class="thinking-dot"></span>
                 <span class="thinking-dot"></span>
                 <span class="thinking-dot"></span>
             </div>
-            <div id="bottom-spacer"></div>
         </div>
         <div id="input-container">
-            <input type="text" id="user-input" placeholder="Type your message..." />
-            <button id="action-button" onclick="handleAction()">
+            <input type="text" id="user-input" placeholder="Ask Luna anything...">
+            <button id="action-button">
                 <svg id="button-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--button-text)" stroke-width="2">
-                    <path d="M12 19L12 5M5 12L12 5L19 12" />
+                    <path d="M12 19L12 5M5 12L12 5L19 12"></path>
                 </svg>
             </button>
+        </div>
+        <div id="status-button-container">
+            <div id="ai-status-container">
+                <div class="ai-status">
+                    <span class="ai-icon grok">G</span>
+                    <div class="status-squares">
+                        <span class="status-square"></span>
+                        <span class="status-square"></span>
+                        <span class="status-square"></span>
+                    </div>
+                </div>
+                <div class="ai-status">
+                    <span class="ai-icon gemini">M</span>
+                    <div class="status-squares">
+                        <span class="status-square"></span>
+                        <span class="status-square"></span>
+                        <span class="status-square"></span>
+                    </div>
+                </div>
+                <div class="ai-status">
+                    <span class="ai-icon openai">O</span>
+                    <div class="status-squares">
+                        <span class="status-square"></span>
+                        <span class="status-square"></span>
+                        <span class="status-square"></span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     <script src="index.js"></script>

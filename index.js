@@ -1,11 +1,12 @@
 const chatContainer = document.getElementById('chat-container');
 const userInput = document.getElementById('user-input');
+const actionButton = document.getElementById('action-button');
 const thinkingIndicator = document.getElementById('thinking-indicator');
 let isTyping = false;
-let currentTypingTimeouts = []; // Store active timeouts to cancel later
-let currentTypingMessage = null; // Store current typing message element
+let currentTypingTimeouts = [];
+let currentTypingMessage = null;
 
-// Load API keys from apikey.json
+// Load API keys
 let openAIApiKey = '';
 let xAIApiKey = '';
 let geminiApiKey = '';
@@ -25,6 +26,7 @@ async function loadApiKeys() {
       xAIApiKey: xAIApiKey ? 'present' : 'missing',
       geminiApiKey: geminiApiKey ? 'present' : 'missing'
     });
+    updateAIStatus(); // Initialize status squares
   } catch (error) {
     console.error('Failed to load API keys:', error.message, error.stack);
     appendMessage('bot', 'No AI available', false, true);
@@ -32,49 +34,95 @@ async function loadApiKeys() {
   }
 }
 
-// Check AI availability with priority: Grok > Gemini > OpenAI
+// Update AI status squares
+function updateAIStatus(lastUsedAI = null, availableAIs = []) {
+  const aiStatus = {
+    grok: { element: document.querySelector('.ai-status .grok'), squares: document.querySelectorAll('.ai-status:has(.grok) .status-square') },
+    gemini: { element: document.querySelector('.ai-status .gemini'), squares: document.querySelectorAll('.ai-status:has(.gemini) .status-square') },
+    openai: { element: document.querySelector('.ai-status .openai'), squares: document.querySelectorAll('.ai-status:has(.openai) .status-square') }
+  };
+
+  ['grok', 'gemini', 'openai'].forEach(ai => {
+    const { squares } = aiStatus[ai];
+    // Reset all squares to default (gray)
+    squares.forEach(square => {
+      square.classList.remove('online', 'offline');
+      square.style.background = ''; // Reset to CSS default
+    });
+
+    // Set status (bottom-up due to column-reverse)
+    if (!openAIApiKey && ai === 'openai' || !xAIApiKey && ai === 'grok' || !geminiApiKey && ai === 'gemini') {
+      // Offline: 1 red square (bottom due to column-reverse)
+      squares[0].classList.add('offline');
+      squares[1].style.background = '';
+      squares[2].style.background = '';
+    } else if (lastUsedAI === ai) {
+      // Used: 3 green squares
+      squares.forEach(square => square.classList.add('online'));
+    } else if (availableAIs.includes(ai)) {
+      // Online: 1 green square (bottom)
+      squares[0].classList.add('online');
+      squares[1].style.background = '';
+      squares[2].style.background = '';
+    } else {
+      // Offline: 1 red square (bottom)
+      squares[0].classList.add('offline');
+      squares[1].style.background = '';
+      squares[2].style.background = '';
+    }
+  });
+  console.log(`Updated AI status: Last used=${lastUsedAI || 'none'}, Available=${availableAIs}`);
+}
+
+// Check AI availability
 async function checkAIAvailability() {
   const testPrompt = 'test';
   const availableAIs = [];
 
-  // Test xAI (Grok) first
+  // Test xAI (Grok)
   if (xAIApiKey) {
     try {
       const response = await fetchGrok(testPrompt);
       if (response) {
-        availableAIs.push({ name: 'Grok', fetch: fetchGrok, model: 'grok-beta' });
+        availableAIs.push('grok');
       }
     } catch (error) {
       console.log('Grok unavailable:', error.message, error.stack);
     }
   }
 
-  // Test Gemini second
+  // Test Gemini
   if (geminiApiKey) {
     try {
       const response = await fetchGemini(testPrompt);
       if (response) {
-        availableAIs.push({ name: 'Gemini', fetch: fetchGemini, model: 'gemini-2.0-flash' });
+        availableAIs.push('gemini');
       }
     } catch (error) {
       console.log('Gemini unavailable:', error.message, error.stack);
     }
   }
 
-  // Test OpenAI last
+  // Test OpenAI
   if (openAIApiKey) {
     try {
       const response = await fetchChatGPT(testPrompt, 'gpt-4o');
       if (response) {
-        availableAIs.push({ name: 'OpenAI', fetch: fetchChatGPT, model: 'gpt-4o' });
+        availableAIs.push('openai');
       }
     } catch (error) {
       console.log('OpenAI unavailable:', error.message, error.stack);
     }
   }
 
-  console.log('Available AIs:', availableAIs.map(ai => ai.name));
-  return availableAIs.length > 0 ? availableAIs[0] : null;
+  console.log('Available AIs:', availableAIs);
+  const aiList = [
+    ...(availableAIs.includes('grok') ? [{ name: 'Grok', fetch: fetchGrok, model: 'grok-beta', id: 'grok' }] : []),
+    ...(availableAIs.includes('gemini') ? [{ name: 'Gemini', fetch: fetchGemini, model: 'gemini-2.0-flash', id: 'gemini' }] : []),
+    ...(availableAIs.includes('openai') ? [{ name: 'OpenAI', fetch: fetchChatGPT, model: 'gpt-4o', id: 'openai' }] : [])
+  ];
+  updateAIStatus(null, availableAIs);
+  return aiList.length > 0 ? aiList[0] : null;
 }
 
 // Debounce utility
@@ -98,7 +146,7 @@ function scrollToBottom() {
 function updateActionButton() {
   const button = document.getElementById('action-button');
   const currentIcon = document.getElementById('button-icon');
-  currentIcon.remove(); // Remove current icon
+  currentIcon.remove();
 
   if (isTyping) {
     const svgIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -139,19 +187,19 @@ function stopTyping() {
     if (currentTypingMessage) {
       const bubble = currentTypingMessage.querySelector('.bubble');
       if (bubble && bubble.textContent) {
-        bubble.textContent += '...'; // Append "..." to partial message
+        bubble.textContent += '...';
       }
     }
-    updateActionButton(); // Restore up arrow SVG
+    updateActionButton();
     scrollToBottom();
   }
 }
 
 function handleAction() {
   if (isTyping) {
-    stopTyping(); // Stop Luna mid-thought
+    stopTyping();
   } else {
-    sendMessage(); // Send user input
+    sendMessage();
   }
 }
 
@@ -183,6 +231,7 @@ async function sendMessage() {
   if (!openAIApiKey && !xAIApiKey && !geminiApiKey) {
     appendMessage('bot', 'No AI available', false, true);
     console.log('Error displayed: No API keys loaded');
+    updateAIStatus();
     return;
   }
 
@@ -191,6 +240,7 @@ async function sendMessage() {
     if (!availableAI) {
       appendMessage('bot', 'No AI available', false, true);
       console.log('Error displayed: No AI services available');
+      updateAIStatus();
       return;
     }
 
@@ -199,15 +249,18 @@ async function sendMessage() {
     let reply;
     try {
       reply = await availableAI.fetch(input, availableAI.model);
+      updateAIStatus(availableAI.id, [availableAI.id]); // Update status after successful query
     } catch (error) {
       if (availableAI.name === 'OpenAI' && error.message.includes('insufficient_quota')) {
         console.log('OpenAI quota exceeded, trying gpt-3.5-turbo');
         try {
           reply = await fetchChatGPT(input, 'gpt-3.5-turbo');
+          updateAIStatus('openai', ['openai']);
         } catch (fallbackError) {
           console.log('Fallback to gpt-3.5-turbo failed, trying gpt-4o-mini');
           try {
             reply = await fetchChatGPT(input, 'gpt-4o-mini');
+            updateAIStatus('openai', ['openai']);
           } catch (miniError) {
             throw new Error(`OpenAI fallbacks failed: ${miniError.message}`);
           }
@@ -221,9 +274,10 @@ async function sendMessage() {
   } catch (error) {
     console.error('SendMessage error:', error.message, error.stack);
     hideThinking();
-    stopTyping(); // Ensure isTyping is reset
+    stopTyping();
     appendMessage('bot', 'No AI available', false, true);
     console.log('Error displayed: Failed to get response', { message: error.message, stack: error.stack });
+    updateAIStatus();
   }
 }
 
@@ -233,7 +287,7 @@ async function fetchChatGPT(prompt, model = 'gpt-4o') {
     const timeoutId = setTimeout(() => {
       controller.abort();
       console.log('fetchChatGPT timed out');
-    }, 10000); // 10s timeout
+    }, 10000);
 
     const headers = {
       'Content-Type': 'application/json',
@@ -273,7 +327,7 @@ async function fetchGrok(prompt, model = 'grok-beta') {
     const timeoutId = setTimeout(() => {
       controller.abort();
       console.log('fetchGrok timed out');
-    }, 10000); // 10s timeout
+    }, 10000);
 
     const headers = {
       'Content-Type': 'application/json',
@@ -313,11 +367,11 @@ async function fetchGemini(prompt, model = 'gemini-2.0-flash') {
     const timeoutId = setTimeout(() => {
       controller.abort();
       console.log('fetchGemini timed out');
-    }, 10000); // 10s timeout
+    }, 10000);
 
     const headers = {
       'Content-Type': 'application/json',
-      'X-goog-api-key': geminiApiKey // Updated header to match curl
+      'X-goog-api-key': geminiApiKey
     };
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -337,7 +391,7 @@ async function fetchGemini(prompt, model = 'gemini-2.0-flash') {
     }
 
     const data = await response.json();
-    console.log('fetchGemini response:', JSON.stringify(data, null, 2)); // Debug response
+    console.log('fetchGemini response:', JSON.stringify(data, null, 2));
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
       throw new Error('No valid response from Gemini');
     }
@@ -365,12 +419,10 @@ function appendMessage(role, text, isThinking = false, isError = false) {
     msg.textContent = text;
   }
 
-  // Insert before bottom-spacer to keep it at the bottom
   const bottomSpacer = document.getElementById('bottom-spacer');
   chatContainer.insertBefore(msg, bottomSpacer);
   console.log(`Appending message: ${role} - ${text}`);
   scrollToBottom();
-  // Verify DOM insertion
   if (!msg.isConnected) {
     console.error('Message not appended to DOM:', msg);
   }
@@ -379,7 +431,7 @@ function appendMessage(role, text, isThinking = false, isError = false) {
 async function typeBotMessage(text, isError = false) {
   if (isTyping) {
     console.log('Blocked overlapping typeBotMessage call, stopping current typing');
-    stopTyping(); // Clear any ongoing typing
+    stopTyping();
   }
 
   const msg = document.createElement('div');
@@ -395,8 +447,8 @@ async function typeBotMessage(text, isError = false) {
   console.log('Appending typing message: bot');
 
   isTyping = true;
-  currentTypingMessage = msg; // Store current message
-  updateActionButton(); // Show stop icon
+  currentTypingMessage = msg;
+  updateActionButton();
 
   currentTypingTimeouts = [];
 
@@ -411,26 +463,22 @@ async function typeBotMessage(text, isError = false) {
     currentTypingTimeouts.push(timeout);
   }
 
-  // Reset after complete
   const totalTime = text.length * 15;
   const reset = setTimeout(() => {
     isTyping = false;
     currentTypingMessage = null;
-    updateActionButton(); // Restore up arrow SVG
+    updateActionButton();
     scrollToBottom();
   }, totalTime);
 
   currentTypingTimeouts.push(reset);
 }
 
-// Dark mode toggle
 function initializeDarkMode() {
   const toggle = document.getElementById('dark-mode-toggle');
-  // Default to dark mode unless light is explicitly saved
   const savedTheme = localStorage.getItem('theme') || 'dark';
   document.documentElement.setAttribute('data-theme', savedTheme);
   toggle.checked = savedTheme === 'dark';
-  // Force theme update
   document.documentElement.classList.add('theme-transition');
   setTimeout(() => document.documentElement.classList.remove('theme-transition'), 300);
 
@@ -443,6 +491,12 @@ function initializeDarkMode() {
   });
 }
 
+// Initialize event listeners
+function initializeEventListeners() {
+  actionButton.addEventListener('click', handleAction);
+  console.log('Action button event listener attached');
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   appendMessage("bot", "Hi, I'm Luna. How can I help?");
 });
@@ -450,5 +504,6 @@ window.addEventListener("DOMContentLoaded", () => {
 window.addEventListener('load', async () => {
   await loadApiKeys();
   initializeDarkMode();
+  initializeEventListeners();
   scrollToBottom();
 });
