@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,12 +17,17 @@
         </div>
         <div id="chat-container">
             <div id="filler"></div>
-           <!--<div id="bottom-spacer"></div>-->
+            <div id="thinking-indicator">
+                <span class="thinking-dot"></span>
+                <span class="thinking-dot"></span>
+                <span class="thinking-dot"></span>
+            </div>
+            <div id="bottom-spacer"></div>
         </div>
         <div id="input-container">
             <input type="text" id="user-input" placeholder="Type your message..." />
-            <button id="send-button" onclick="sendMessage()">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--button-text)" stroke-width="2">
+            <button id="action-button" onclick="handleAction()">
+                <svg id="button-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--button-text)" stroke-width="2">
                     <path d="M12 19L12 5M5 12L12 5L19 12" />
                 </svg>
             </button>

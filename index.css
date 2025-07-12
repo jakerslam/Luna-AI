@@ -13,6 +13,8 @@
     --button-hover-bg: #005ecb;
     --shadow: rgba(0, 0, 0, 0.1);
     --header-text: #222;
+    --error-text: #ff0000; /* Red for errors in light mode */
+    --thinking-color: #222; /* Dots color in light mode */
 }
 
 [data-theme="dark"] {
@@ -29,6 +31,8 @@
     --button-hover-bg: #4682b4;
     --shadow: rgba(0, 0, 0, 0.5);
     --header-text: #e0e0e0;
+    --error-text: #ff5555; /* Lighter red for errors in dark mode */
+    --thinking-color: #e0e0e0; /* Dots color in dark mode */
 }
 
 /* Reset & Base */
@@ -50,9 +54,10 @@ html, body {
 
 /* Chat Container */
 .chat-wrapper {
-    width: 100%;
-    max-width: 600px;
-    height: 90vh; /* Explicit height */
+    width: 800px; /* Fixed width for desktop */
+    max-width: 800px;
+    min-width: 600px; /* Prevent shrinking when empty */
+    height: 80vh;
     background: var(--chat-bg);
     border-radius: 16px;
     box-shadow: 0 15px 40px var(--shadow);
@@ -154,13 +159,68 @@ input:not(:checked) + .slider::after {
     overflow-y: auto;
     padding: 20px;
     gap: 10px;
+    justify-content: flex-end;
     max-height: calc(80vh - 110px);
     box-sizing: border-box;
+    background: var(--chat-bg); /* Ensure chat container follows theme */
+    transition: background 0.3s ease;
+    position: relative; /* For positioning thinking indicator */
 }
 
 #filler {
     flex-grow: 1; /* Push messages downward */
-  }
+}
+
+#bottom-spacer {
+    height: 1px;
+    visibility: hidden;
+}
+
+/* Thinking Indicator (Three-Dot Worm Animation) */
+#thinking-indicator {
+    display: none;
+    position: absolute;
+    bottom: 10px;
+    left: 20px;
+    font-size: 16px;
+}
+
+.thinking-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--thinking-color);
+    border-radius: 50%;
+    margin-right: 4px;
+    animation: worm 1.2s infinite;
+}
+
+.thinking-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.thinking-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes worm {
+    0%, 20% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    40% {
+        transform: translateY(-4px);
+        opacity: 0.8;
+    }
+    60% {
+        transform: translateY(4px);
+        opacity: 0.8;
+    }
+    80%, 100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
 
 /* Messages */
 .message {
@@ -203,10 +263,10 @@ input:not(:checked) + .slider::after {
     transition: background 0.3s ease, color 0.3s ease;
 }
 
-#bottom-spacer {
-    height: 1px;
-    visibility: hidden;
-  }
+.bot.error .bubble {
+    color: var(--error-text);
+    font-size: 14.4px; /* 90% of 16px */
+}
 
 /* Input Section */
 #input-container {
@@ -231,7 +291,7 @@ input:not(:checked) + .slider::after {
     transition: background 0.3s ease, color 0.3s ease, border 0.3s ease;
 }
 
-#send-button {
+#action-button {
     width: 40px;
     height: 40px;
     background: var(--button-bg);
@@ -244,28 +304,13 @@ input:not(:checked) + .slider::after {
     transition: background 0.3s ease;
 }
 
-#send-button:hover {
+#action-button:hover {
     background: var(--button-hover-bg);
 }
 
-#send-button svg {
+#action-button svg {
     width: 24px;
     height: 24px;
-}
-
-/* Typing Dots Animation */
-.dots::after {
-    content: '';
-    display: inline-block;
-    width: 1em;
-    animation: dots 1.2s steps(3, end) infinite;
-}
-
-@keyframes dots {
-    0%   { content: ''; }
-    33%  { content: '.'; }
-    66%  { content: '..'; }
-    100% { content: '...'; }
 }
 
 /* Theme Transition */
@@ -276,11 +321,17 @@ input:not(:checked) + .slider::after {
 /* Mobile Responsive */
 @media (max-width: 640px) {
     .chat-wrapper {
-        width: 90%;
+        width: 95%;
+        min-width: unset; /* Allow mobile to shrink */
         height: 90vh;
     }
 
     #chat-container {
         max-height: calc(90vh - 110px);
+    }
+
+    #thinking-indicator {
+        left: 10px;
+        bottom: 8px;
     }
 }
