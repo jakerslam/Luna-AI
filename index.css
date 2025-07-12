@@ -169,7 +169,7 @@ input:not(:checked) + .slider::after {
     max-height: calc(80vh - 110px);
     box-sizing: border-box;
     background: var(--chat-bg);
-    border-bottom: 1px solid var(--input-border); /* Reintroduced border */
+    border-bottom: 1px solid var(--input-border);
     transition: background 0.3s ease, border-bottom 0.3s ease;
 }
 
@@ -178,7 +178,7 @@ input:not(:checked) + .slider::after {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
-    padding: 15px;
+    padding: 10px 15px; /* Reduced padding */
     background: var(--input-bg);
     gap: 10px;
     flex-shrink: 0;
@@ -188,8 +188,8 @@ input:not(:checked) + .slider::after {
 /* Status Button Container */
 #status-button-container {
     display: flex;
-    justify-content: center; /* Center the status button */
-    padding: 10px 15px;
+    justify-content: flex-start; /* Float left */
+    padding: 5px 15px; /* Reduced padding */
     background: var(--input-bg);
     flex-shrink: 0;
     transition: background 0.3s ease;
@@ -201,7 +201,7 @@ input:not(:checked) + .slider::after {
     justify-content: flex-start;
     align-items: center;
     gap: 24px;
-    padding: 6px 12px; /* Reduced padding for compact look */
+    padding: 6px 12px; /* Compact look */
     background: var(--input-bg);
     border: 1px solid var(--input-border);
     border-radius: 18px; /* Pill shape: half of height (36px / 2) */
@@ -371,7 +371,7 @@ input:not(:checked) + .slider::after {
     flex: 1;
     padding: 12px 15px;
     font-size: 16px;
-    border: none; /* Removed border */
+    border: none;
     border-radius: 8px;
     outline: none;
     background: var(--input-bg);
@@ -416,7 +416,7 @@ input:not(:checked) + .slider::after {
     }
 
     #chat-container {
-        max-height: calc(90vh - 110px);
+        max-height: calc(90vh - 100px); /* Adjusted for reduced padding */
     }
 
     #thinking-indicator {
@@ -428,5 +428,13 @@ input:not(:checked) + .slider::after {
         gap: 18px;
         padding: 6px 10px;
         border-radius: 16px; /* Adjusted for smaller height */
+    }
+
+    #input-container {
+        padding: 8px 10px; /* Reduced for mobile */
+    }
+
+    #status-button-container {
+        padding: 4px 10px; /* Reduced for mobile */
     }
 }

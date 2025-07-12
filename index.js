@@ -11,6 +11,8 @@ let openAIApiKey = '';
 let xAIApiKey = '';
 let geminiApiKey = '';
 
+const LUNA_DIRECTIVE = "You are Luna, a super friendly helpful chatbot. You really care about this person. ";
+
 async function loadApiKeys() {
   try {
     const response = await fetch('apikey.json');
@@ -247,19 +249,20 @@ async function sendMessage() {
     showThinking();
     console.log(`Using AI: ${availableAI.name}, Model: ${availableAI.model}`);
     let reply;
+    const promptWithDirective = LUNA_DIRECTIVE + input;
     try {
-      reply = await availableAI.fetch(input, availableAI.model);
+      reply = await availableAI.fetch(promptWithDirective, availableAI.model);
       updateAIStatus(availableAI.id, [availableAI.id]); // Update status after successful query
     } catch (error) {
       if (availableAI.name === 'OpenAI' && error.message.includes('insufficient_quota')) {
         console.log('OpenAI quota exceeded, trying gpt-3.5-turbo');
         try {
-          reply = await fetchChatGPT(input, 'gpt-3.5-turbo');
+          reply = await fetchChatGPT(promptWithDirective, 'gpt-3.5-turbo');
           updateAIStatus('openai', ['openai']);
         } catch (fallbackError) {
           console.log('Fallback to gpt-3.5-turbo failed, trying gpt-4o-mini');
           try {
-            reply = await fetchChatGPT(input, 'gpt-4o-mini');
+            reply = await fetchChatGPT(promptWithDirective, 'gpt-4o-mini');
             updateAIStatus('openai', ['openai']);
           } catch (miniError) {
             throw new Error(`OpenAI fallbacks failed: ${miniError.message}`);
@@ -299,7 +302,7 @@ async function fetchChatGPT(prompt, model = 'gpt-4o') {
       headers,
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'system', content: LUNA_DIRECTIVE }, { role: 'user', content: prompt }],
       }),
       signal: controller.signal
     });
@@ -339,7 +342,7 @@ async function fetchGrok(prompt, model = 'grok-beta') {
       headers,
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'system', content: LUNA_DIRECTIVE }, { role: 'user', content: prompt }],
       }),
       signal: controller.signal
     });
@@ -378,7 +381,7 @@ async function fetchGemini(prompt, model = 'gemini-2.0-flash') {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
+        contents: [{ parts: [{ text: LUNA_DIRECTIVE + prompt }] }]
       }),
       signal: controller.signal
     });
