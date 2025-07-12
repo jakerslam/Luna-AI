@@ -1,21 +1,18 @@
-const chatContainer = document.getElementById("chat-container");
-const userInput = document.getElementById("user-input");
+const chatContainer = document.getElementById('chat-container');
+const userInput = document.getElementById('user-input');
 
-async function sendMessage() {
-  const input = userInput.value.trim();
-  if (!input) return;
+// Load API key from apikey.json
+let openAIApiKey = '';
 
-  appendMessage("user", input);
-  userInput.value = "";
-
-  const thinkingEl = appendMessage("bot", "Luna is thinking", true);
-  animateDots(thinkingEl);
-
-  const reply = await fetchChatGPT(input);
-
-  clearInterval(thinkingEl._dotInterval);
-  thinkingEl.remove();
-  await typeBotMessage(reply);
+async function loadApiKey() {
+  try {
+    const response = await fetch('apikey.json');
+    const data = await response.json();
+    openAIApiKey = data.openAIApiKey;
+  } catch (error) {
+    console.error('Failed to load API key:', error);
+    appendMessage('bot', '[Error: Could not load API key. Please check apikey.json.]');
+  }
 }
 
 // Debounce utility
@@ -27,20 +24,73 @@ function debounce(func, wait) {
   };
 }
 
-// Debounced scroll function
 const scrollToBottom = debounce(() => {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }, 10);
 
-function appendMessage(role, text, isThinking = false) {
-  const msg = document.createElement("div");
-  msg.classList.add("message", role);
+async function sendMessage() {
+  const input = userInput.value.trim();
+  if (!input) return;
 
-  if (role === "bot") {
-    const bubble = document.createElement("div");
-    bubble.classList.add("bubble");
+  appendMessage('user', input);
+  userInput.value = '';
+
+  if (!openAIApiKey) {
+    appendMessage('bot', '[Error: API key not loaded. Please check apikey.json.]');
+    return;
+  }
+
+  const thinkingEl = appendMessage('bot', 'Luna is thinking', true);
+  animateDots(thinkingEl);
+
+  try {
+    const reply = await fetchChatGPT(input);
+    clearInterval(thinkingEl._dotInterval);
+    thinkingEl.remove();
+    await typeBotMessage(reply);
+  } catch (error) {
+    clearInterval(thinkingEl._dotInterval);
+    thinkingEl.remove();
+    await typeBotMessage('[Error: Failed to get response from ChatGPT]');
+  }
+}
+
+async function fetchChatGPT(prompt) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openAIApiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    return data.choices[0]?.message?.content || '[No response]';
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+function appendMessage(role, text, isThinking = false) {
+  const msg = document.createElement('div');
+  msg.classList.add('message', role);
+
+  if (role === 'bot') {
+    const bubble = document.createElement('div');
+    bubble.classList.add('bubble');
     bubble.textContent = text;
-    if (isThinking) bubble.classList.add("dots");
+    if (isThinking) bubble.classList.add('dots');
     msg.appendChild(bubble);
   } else {
     msg.textContent = text;
@@ -52,14 +102,14 @@ function appendMessage(role, text, isThinking = false) {
 }
 
 async function typeBotMessage(text) {
-  const msg = document.createElement("div");
-  msg.classList.add("message", "bot");
-  const bubble = document.createElement("div");
-  bubble.classList.add("bubble");
+  const msg = document.createElement('div');
+  msg.classList.add('message', 'bot');
+  const bubble = document.createElement('div');
+  bubble.classList.add('bubble');
   msg.appendChild(bubble);
   chatContainer.appendChild(msg);
 
-  const textNode = document.createTextNode("");
+  const textNode = document.createTextNode('');
   bubble.appendChild(textNode);
 
   for (let i = 0; i < text.length; i++) {
@@ -69,46 +119,39 @@ async function typeBotMessage(text) {
   }
 }
 
-async function fetchChatGPT(prompt) {
-  const apiKey = "YOUR_API_KEY_HERE"; // Replace this
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  const data = await response.json();
-  return data.choices[0]?.message?.content || "[No response]";
-}
-
 function animateDots(el) {
   let dots = 0;
-  const bubble = el.querySelector(".bubble");
-  const baseText = "Luna is thinking ";
+  const bubble = el.querySelector('.bubble');
+  const baseText = 'Luna is thinking ';
   bubble.textContent = baseText;
-  const dotsSpan = document.createElement("span");
+  const dotsSpan = document.createElement('span');
   bubble.appendChild(dotsSpan);
 
   const interval = setInterval(() => {
-    dotsSpan.textContent = ".".repeat(dots % 4);
+    dotsSpan.textContent = '.'.repeat(dots % 4);
     dots++;
   }, 500);
   el._dotInterval = interval;
 }
 
-window.onload = () => {
-  setTimeout(() => {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    console.log("Scrolled to:", chatContainer.scrollTop);
-  }, 100);
-};
+// Dark mode toggle
+function initializeDarkMode() {
+  const toggle = document.getElementById('dark-mode-toggle');
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  toggle.checked = savedTheme === 'dark';
 
-window.addEventListener("resize", () => {
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  toggle.addEventListener('change', () => {
+    const theme = toggle.checked ? 'dark' : 'light';
+    document.documentElement.classList.add('theme-transition');
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    setTimeout(() => document.documentElement.classList.remove('theme-transition'), 300);
+  });
+}
+
+window.addEventListener('load', async () => {
+  await loadApiKey();
+  initializeDarkMode();
+  appendMessage('bot', "Hi, I'm Luna! How can I help you today?");
 });

@@ -1,3 +1,36 @@
+/* CSS Variables for Theming */
+:root {
+    --background: #f0f2f5;
+    --chat-bg: white;
+    --user-bg: #0078ff;
+    --user-text: white;
+    --bot-bg: #f1f1f1;
+    --bot-text: #222;
+    --input-bg: #fafafa;
+    --input-border: #ccc;
+    --button-bg: #0078ff;
+    --button-text: white;
+    --button-hover-bg: #005ecb;
+    --shadow: rgba(0, 0, 0, 0.1);
+    --header-text: #222;
+}
+
+[data-theme="dark"] {
+    --background: #1a1a1a;
+    --chat-bg: #2c2c2c;
+    --user-bg: #1e90ff;
+    --user-text: white;
+    --bot-bg: #3a3a3a;
+    --bot-text: #e0e0e0;
+    --input-bg: #333;
+    --input-border: #555;
+    --button-bg: #1e90ff;
+    --button-text: #e0e0e0;
+    --button-hover-bg: #4682b4;
+    --shadow: rgba(0, 0, 0, 0.5);
+    --header-text: #e0e0e0;
+}
+
 /* Reset & Base */
 * {
     box-sizing: border-box;
@@ -7,11 +40,12 @@
 
 body {
     font-family: 'Segoe UI', sans-serif;
-    background: #f0f2f5;
+    background: var(--background);
     height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background 0.3s ease;
 }
 
 /* Chat Container */
@@ -19,13 +53,96 @@ body {
     width: 100%;
     max-width: 600px;
     height: 80vh;
-    background: white;
+    background: var(--chat-bg);
     border-radius: 16px;
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 15px 40px var(--shadow);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     padding: 10px;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Chat Header */
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--input-border);
+    transition: border-bottom 0.3s ease;
+}
+
+.chat-header h1 {
+    font-size: 20px;
+    color: var(--header-text);
+    transition: color 0.3s ease;
+}
+
+/* Dark Mode Toggle */
+.dark-mode-toggle {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.dark-mode-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: background-color 0.3s ease;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: transform 0.3s ease, background-color 0.3s ease;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--button-bg);
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+.slider::after {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    line-height: 1;
+}
+
+input:checked + .slider::after {
+    content: "🌙";
+    left: 6px;
+    color: white;
+}
+
+input:not(:checked) + .slider::after {
+    content: "☀";
+    right: 6px;
+    color: #333;
 }
 
 /* Chat Box Area */
@@ -38,31 +155,33 @@ body {
     gap: 10px;
     justify-content: flex-end;
     box-sizing: border-box;
+    transition: background 0.3s ease;
 }
 
 /* Messages */
 .message {
     max-width: 80%;
-    padding: 8px 12px; /* Standardized padding */
+    padding: 8px 12px;
     border-radius: 18px;
     white-space: pre-wrap;
     word-wrap: break-word;
     font-size: 16px;
     line-height: 1.4;
+    transition: background 0.3s ease, color 0.3s ease;
 }
 
 .user {
     align-self: flex-end;
-    background-color: #0078ff;
-    color: white;
+    background-color: var(--user-bg);
+    color: var(--user-text);
     border-bottom-right-radius: 4px;
 }
 
 .bot {
-    align-self: stretch; /* Full width for bot messages */
+    align-self: stretch;
     display: flex;
     justify-content: flex-start;
-    max-width: 100%; /* Ensure bot message takes full width */
+    max-width: 100%;
 }
 
 .bot::after {
@@ -70,48 +189,60 @@ body {
 }
 
 .bot .bubble {
-    background-color: #f1f1f1;
-    color: #222;
+    background-color: var(--bot-bg);
+    color: var(--bot-text);
     border-radius: 16px;
-    padding: 8px 12px; /* Standardized padding */
-    max-width: 100%; /* Full width for bubble */
+    padding: 8px 12px;
+    max-width: 100%;
     margin: 4px;
     border-bottom-left-radius: 4px;
-    min-width: 100px; /* Prevent width changes during typing or dots animation */
-    width: 100%; /* Ensure bubble spans full width */
+    min-width: 100px;
+    width: 100%;
+    transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* Input Section */
 #input-container {
     display: flex;
     padding: 15px;
-    border-top: 1px solid #ddd;
-    background: #fafafa;
+    border-top: 1px solid var(--input-border);
+    background: var(--input-bg);
     gap: 10px;
+    transition: background 0.3s ease, border-top 0.3s ease;
 }
 
 #user-input {
     flex: 1;
     padding: 12px 15px;
     font-size: 16px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--input-border);
     border-radius: 8px;
     outline: none;
+    background: var(--input-bg);
+    color: var(--bot-text);
+    transition: background 0.3s ease, color 0.3s ease, border 0.3s ease;
 }
 
-button {
-    padding: 12px 20px;
-    font-size: 16px;
-    background: #0078ff;
-    color: white;
+#send-button {
+    width: 40px;
+    height: 40px;
+    background: var(--button-bg);
     border: none;
-    border-radius: 8px;
+    border-radius: 50%;
     cursor: pointer;
-    transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease;
 }
 
-button:hover {
-    background: #005ecb;
+#send-button:hover {
+    background: var(--button-hover-bg);
+}
+
+#send-button svg {
+    width: 24px;
+    height: 24px;
 }
 
 /* Typing Dots Animation */
@@ -135,4 +266,9 @@ button:hover {
         width: 90%;
         height: 90vh;
     }
+}
+
+/* Theme Transition */
+.theme-transition, .theme-transition * {
+    transition: background 0.3s ease, color 0.3s ease, border 0.3s ease, box-shadow 0.3s ease !important;
 }
