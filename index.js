@@ -30,10 +30,22 @@ function debounce(func, wait) {
   };
 }
 
-const scrollToBottom = debounce(() => {
-  console.log('Scrolling to bottom, scrollHeight:', chatContainer.scrollHeight, 'scrollTop:', chatContainer.scrollTop, 'clientHeight:', chatContainer.clientHeight);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-}, 10);
+// const scrollToBottom = debounce(() => {
+//   console.log('Scrolling to bottom, scrollHeight:', chatContainer.scrollHeight, 'scrollTop:', chatContainer.scrollTop, 'clientHeight:', chatContainer.clientHeight);
+//   chatContainer.scrollTop = chatContainer.scrollHeight;
+//   const spacer = document.getElementById('bottom-spacer');
+//   if (spacer) {
+//     spacer.scrollIntoView({ behavior: 'auto' });
+//   }
+// }, 10);
+
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }, 0);
+  });
+}
 
 async function sendMessage() {
   const input = userInput.value.trim();
@@ -186,9 +198,13 @@ function initializeDarkMode() {
 }
 
 
+window.addEventListener("DOMContentLoaded", () => {
+  appendMessage("bot", "Hi, I'm Luna. How can I help?");
+});
 
 window.addEventListener('load', async () => {
   await loadApiKey();
   initializeDarkMode();
-  appendMessage('bot', "Hi, I'm Luna! How can I help you today?");
+  scrollToBottom();
 });
+
