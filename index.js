@@ -7,11 +7,17 @@ let openAIApiKey = '';
 async function loadApiKey() {
   try {
     const response = await fetch('apikey.json');
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
     const data = await response.json();
+    if (!data.openAIApiKey) {
+      throw new Error('openAIApiKey not found in apikey.json');
+    }
     openAIApiKey = data.openAIApiKey;
   } catch (error) {
-    console.error('Failed to load API key:', error);
-    appendMessage('bot', '[Error: Could not load API key. Please check apikey.json.]');
+    console.error('Failed to load API key:', error.message);
+    appendMessage('bot', `[Error: Could not load API key. ${error.message}]`);
   }
 }
 
@@ -25,6 +31,7 @@ function debounce(func, wait) {
 }
 
 const scrollToBottom = debounce(() => {
+  console.log('Scrolling to bottom, scrollHeight:', chatContainer.scrollHeight, 'scrollTop:', chatContainer.scrollTop, 'clientHeight:', chatContainer.clientHeight);
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }, 10);
 
@@ -49,33 +56,61 @@ async function sendMessage() {
     thinkingEl.remove();
     await typeBotMessage(reply);
   } catch (error) {
+    console.error('ChatGPT error:', error.message);
     clearInterval(thinkingEl._dotInterval);
     thinkingEl.remove();
-    await typeBotMessage('[Error: Failed to get response from ChatGPT]');
+    if (error.message.includes('insufficient_quota')) {
+      await typeBotMessage('[Error: OpenAI quota exceeded. Please check your plan and billing details at https://platform.openai.com. Trying gpt-3.5-turbo...]');
+      try {
+        const fallbackReply = await fetchChatGPT(input, 'gpt-3.5-turbo');
+        await typeBotMessage(fallbackReply);
+      } catch (fallbackError) {
+        await typeBotMessage(`[Error: Fallback to gpt-3.5-turbo failed. ${fallbackError.message}. Trying gpt-4o-mini...]`);
+        try {
+          const miniReply = await fetchChatGPT(input, 'gpt-4o-mini');
+          await typeBotMessage(miniReply);
+        } catch (miniError) {
+          await typeBotMessage(`[Error: Fallback to gpt-4o-mini failed. ${miniError.message}. Please add credits or check billing at https://platform.openai.com.]`);
+        }
+      }
+    } else {
+      await typeBotMessage(`[Error: Failed to get response from ChatGPT. ${error.message}]`);
+    }
   }
 }
 
-async function fetchChatGPT(prompt) {
+async function fetchChatGPT(prompt, model = 'gpt-4o') {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openAIApiKey}`,
+    };
+    // Uncomment and add your project/organization ID if required
+    // headers['OpenAI-Project'] = 'your-project-id';
+    // headers['OpenAI-Organization'] = 'your-org-id';
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openAIApiKey}`,
-      },
+      headers,
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model,
         messages: [{ role: 'user', content: prompt }],
       }),
-      signal: controller.signal,
+      signal: controller.signal
     });
-
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`HTTP error! Status: ${response.status}, Message: ${errorText}`);
+    }
     clearTimeout(timeoutId);
     const data = await response.json();
-    return data.choices[0]?.message?.content || '[No response]';
+    if (!data.choices || !data.choices[0]?.message?.content) {
+      throw new Error('No valid response from ChatGPT');
+    }
+    return data.choices[0].message.content;
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;
@@ -149,6 +184,8 @@ function initializeDarkMode() {
     setTimeout(() => document.documentElement.classList.remove('theme-transition'), 300);
   });
 }
+
+
 
 window.addEventListener('load', async () => {
   await loadApiKey();

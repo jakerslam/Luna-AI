@@ -38,10 +38,10 @@
     padding: 0;
 }
 
-body {
+html, body {
+    height: 100%; /* Ensure full viewport height */
     font-family: 'Segoe UI', sans-serif;
     background: var(--background);
-    height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -52,14 +52,12 @@ body {
 .chat-wrapper {
     width: 100%;
     max-width: 600px;
-    height: 80vh;
+    height: 90vh; /* Explicit height */
     background: var(--chat-bg);
     border-radius: 16px;
     box-shadow: 0 15px 40px var(--shadow);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    padding: 10px;
     transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -70,6 +68,7 @@ body {
     align-items: center;
     padding: 10px 20px;
     border-bottom: 1px solid var(--input-border);
+    flex-shrink: 0;
     transition: border-bottom 0.3s ease;
 }
 
@@ -142,6 +141,7 @@ input:checked + .slider::after {
 input:not(:checked) + .slider::after {
     content: "☀";
     right: 6px;
+    font-size: 14px;
     color: #333;
 }
 
@@ -154,6 +154,7 @@ input:not(:checked) + .slider::after {
     flex-direction: column;
     gap: 10px;
     justify-content: flex-end;
+    max-height: calc(80vh - 110px); /* Direct vh-based constraint */
     box-sizing: border-box;
     transition: background 0.3s ease;
 }
@@ -178,10 +179,10 @@ input:not(:checked) + .slider::after {
 }
 
 .bot {
-    align-self: stretch;
+    align-self: flex-start;
     display: flex;
     justify-content: flex-start;
-    max-width: 100%;
+    max-width: 80%;
 }
 
 .bot::after {
@@ -196,8 +197,6 @@ input:not(:checked) + .slider::after {
     max-width: 100%;
     margin: 4px;
     border-bottom-left-radius: 4px;
-    min-width: 100px;
-    width: 100%;
     transition: background 0.3s ease, color 0.3s ease;
 }
 
@@ -208,6 +207,7 @@ input:not(:checked) + .slider::after {
     border-top: 1px solid var(--input-border);
     background: var(--input-bg);
     gap: 10px;
+    flex-shrink: 0;
     transition: background 0.3s ease, border-top 0.3s ease;
 }
 
@@ -260,15 +260,19 @@ input:not(:checked) + .slider::after {
     100% { content: '...'; }
 }
 
+/* Theme Transition */
+.theme-transition, .theme-transition * {
+    transition: background 0.3s ease, color 0.3s ease, border 0.3s ease, box-shadow 0.3s ease !important;
+}
+
 /* Mobile Responsive */
 @media (max-width: 640px) {
     .chat-wrapper {
         width: 90%;
         height: 90vh;
     }
-}
 
-/* Theme Transition */
-.theme-transition, .theme-transition * {
-    transition: background 0.3s ease, color 0.3s ease, border 0.3s ease, box-shadow 0.3s ease !important;
+    #chat-container {
+        max-height: calc(90vh - 110px);
+    }
 }
