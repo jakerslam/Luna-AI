@@ -85,7 +85,7 @@ html, body {
     position: absolute;
     bottom: 10px;
     right: 20px;
-    color: var(--bot-text);
+    color: white; /* Always white */
     font-size: 12px;
     z-index: 10;
 }
