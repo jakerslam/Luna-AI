@@ -59,7 +59,7 @@ function updateAIStatus(lastUsedAI = null, availableAIsParam = []) {
     }
     squares.forEach(square => {
       square.classList.remove('online', 'offline');
-      square.style.background = '';
+      square.style.background = ''; // Revert to original (no forced color)
     });
 
     const isOffline = (ai === 'qwen' && !openrouterApiKey) || (!xAIApiKey && ai === 'grok') || (!openAIApiKey && ai === 'chatgpt') || (!geminiApiKey && ai === 'gemini');
@@ -76,8 +76,7 @@ function updateAIStatus(lastUsedAI = null, availableAIsParam = []) {
     } else if (availableAIsParam.includes(ai) && lastUsedAI === ai && lastUsedAI !== 'mostRecent') {
       squares.forEach((square, index) => {
         square.classList.add('online');
-        square.style.background = 'green';
-        if (index > 1) square.style.background = '';
+        square.style.background = index === 0 || index === 1 ? 'green' : '';
       });
       console.log(`${ai} set to used (2 green) as last used`);
     } else if (availableAIsParam.includes(ai) && lastUsedAI === ai && lastUsedAI === 'mostRecent') {
@@ -176,7 +175,7 @@ async function checkAIAvailability() {
   ];
   availableAIs = localAvailableAIs; // Update global variable
   updateAIStatus(null, localAvailableAIs);
-  return { ai: aiList[0], availableAIs: localAvailableAIs, aiList: aiList }; // Return aiList along with other data
+  return { ai: aiList[0], availableAIs: localAvailableAIs, aiList: aiList };
 }
 
 function debounce(func, wait) {
@@ -187,28 +186,11 @@ function debounce(func, wait) {
   };
 }
 
-const scrollToBottom = debounce(() => {
+function scrollToBottom() {
   requestAnimationFrame(() => {
-    if (chatContainer.scrollHeight > chatContainer.clientHeight) {
-      const messages = chatContainer.querySelectorAll('.message');
-      if (messages.length > 0) {
-        const lastMessage = messages[messages.length - 1];
-        lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        const rect = lastMessage.getBoundingClientRect();
-        const containerRect = chatContainer.getBoundingClientRect();
-        const style = window.getComputedStyle(chatContainer);
-        console.log('Scrolled to bottom, scrollHeight:', chatContainer.scrollHeight, 'scrollTop:', chatContainer.scrollTop, 'clientHeight:', chatContainer.clientHeight, 'padding:', style.padding);
-        console.log('Last message position:', {
-          top: rect.top,
-          bottom: rect.bottom,
-          containerTop: containerRect.top,
-          containerBottom: containerRect.bottom,
-          isVisible: rect.bottom <= containerRect.bottom && rect.top >= containerRect.top
-        });
-      }
-    }
+    chatContainer.scrollTop = chatContainer.scrollHeight;
   });
-}, 100);
+}
 
 function updateActionButton() {
   const button = document.getElementById('action-button');
@@ -258,7 +240,6 @@ function stopTyping() {
     }
     updateActionButton();
     hideThinking();
-    scrollToBottom();
   }
 }
 
@@ -269,15 +250,16 @@ function showThinking() {
     return;
   }
   thinkingIndicator = document.getElementById('thinking-indicator');
-  if (thinkingIndicator) thinkingIndicator.style.display = 'flex';
-  scrollToBottom();
+  if (thinkingIndicator) {
+    thinkingIndicator.style.display = 'flex';
+    chatContainer.appendChild(thinkingIndicator);
+  }
 }
 
 function hideThinking() {
   if (thinkingIndicator) {
     thinkingIndicator.style.display = 'none';
   }
-  scrollToBottom();
 }
 
 async function sendMessage() {
@@ -286,7 +268,6 @@ async function sendMessage() {
 
   appendMessage('user', input);
   userInput.value = '';
-  scrollToBottom();
   showThinking();
 
   if (!openAIApiKey && !xAIApiKey && !geminiApiKey && !openrouterApiKey) {
@@ -401,11 +382,10 @@ function appendMessage(role, text, isThinking = false, isError = false) {
     msg.appendChild(bubble);
   } else {
     msg.textContent = text;
+    scrollToBottom(); // Scroll to bottom for user messages
   }
 
   chatContainer.appendChild(msg);
-  chatContainer.style.height = 'auto';
-  scrollToBottom();
 }
 
 async function typeBotMessage(text, isError = false) {
@@ -419,7 +399,6 @@ async function typeBotMessage(text, isError = false) {
   msg.appendChild(bubble);
 
   chatContainer.appendChild(msg);
-  chatContainer.style.height = 'auto';
   isTyping = true;
   currentTypingMessage = msg;
   updateActionButton();
@@ -429,7 +408,6 @@ async function typeBotMessage(text, isError = false) {
     if (!isTyping) break;
     const timeout = setTimeout(() => {
       bubble.textContent += text.charAt(i);
-      scrollToBottom();
     }, i * 15);
     currentTypingTimeouts.push(timeout);
   }
@@ -439,7 +417,6 @@ async function typeBotMessage(text, isError = false) {
     isTyping = false;
     currentTypingMessage = null;
     updateActionButton();
-    scrollToBottom();
   }, totalTime);
   currentTypingTimeouts.push(reset);
 }
@@ -454,8 +431,7 @@ function initializeDarkMode() {
     const theme = toggle.checked ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
-    // console.log('Theme changed to:', theme);
-    scrollToBottom();
+    console.log('Theme changed to:', theme);
   });
 }
 
@@ -468,7 +444,7 @@ function handleAction() {
 }
 
 function initializeEventListeners() {
-  // console.log('Initializing event listeners');
+  console.log('Initializing event listeners');
   if (actionButton) actionButton.addEventListener('click', handleAction);
   if (userInput) {
     userInput.addEventListener('keydown', (event) => {
@@ -481,23 +457,25 @@ function initializeEventListeners() {
   }
 }
 
+function displayVersion() {
+  const versionElement = document.createElement('div');
+  versionElement.className = 'version';
+  versionElement.textContent = 'Version 1.0.1';
+  document.querySelector('.chat-wrapper').appendChild(versionElement);
+}
+
 window.addEventListener("DOMContentLoaded", () => {
-  // console.log('DOM loaded, appending initial message');
-  appendMessage("bot", "Hi, I'm Captain AI. How can I help?");
-  scrollToBottom();
+  console.log('DOM loaded, appending initial message');
+  appendMessage("bot", "I'm Luna. How can I help?");
+  displayVersion();
 });
 
 window.addEventListener('load', async () => {
-  // console.log('Window loaded, initializing');
+  console.log('Window loaded, initializing');
   await loadApiKeys();
   updateAIStatus(); // Ensure initial status update
-
-  // Automatically test Qwen on load
-  // console.log('Starting Qwen test...');
-  // console.log('openrouterApiKey value:', openrouterApiKey.length > 0 ? 'present' : 'absent');
-
+  updateAIStatus('qwen', ['qwen'], 'mostRecent'); // Initial Qwen status
 
   initializeDarkMode();
   initializeEventListeners();
-  scrollToBottom();
 });
