@@ -1,7 +1,7 @@
 const chatContainer = document.getElementById('chat-container');
 const userInput = document.getElementById('user-input');
 const actionButton = document.getElementById('action-button');
-const thinkingIndicator = document.getElementById('thinking-indicator');
+let thinkingIndicator = null;
 let isTyping = false;
 let currentTypingTimeouts = [];
 let currentTypingMessage = null;
@@ -9,8 +9,17 @@ let currentTypingMessage = null;
 let openAIApiKey = '';
 let xAIApiKey = '';
 let geminiApiKey = '';
+let openrouterApiKey = '';
 
-const LUNA_DIRECTIVE = "You are Luna, a super friendly helpful chatbot. You really care about this person. ";
+const endpoints = {
+  grok: 'https://api.x.ai/v1/chat/completions',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+  chatgpt: 'https://api.openai.com/v1/chat/completions',
+  qwen: 'https://openrouter.ai/api/v1/chat/completions'
+};
+
+const defaultAi = 'qwen';
+let availableAIs = []; // Global variable to store available AIs
 
 async function loadApiKeys() {
   try {
@@ -20,102 +29,186 @@ async function loadApiKeys() {
     openAIApiKey = data.openAIApiKey || '';
     xAIApiKey = data.xAIApiKey || '';
     geminiApiKey = data.geminiApiKey || '';
-    console.log('Loaded API keys:', {
-      openAIApiKey: openAIApiKey ? 'present' : 'missing',
-      xAIApiKey: xAIApiKey ? 'present' : 'missing',
-      geminiApiKey: geminiApiKey ? 'present' : 'missing'
+    openrouterApiKey = data.openrouterApiKey || '';
+    console.log('Loaded API keys (raw values):', {
+      openAIApiKey: openAIApiKey.length > 0 ? openAIApiKey.substring(0, 5) + '...' : 'empty',
+      xAIApiKey: xAIApiKey.length > 0 ? xAIApiKey.substring(0, 5) + '...' : 'empty',
+      geminiApiKey: geminiApiKey.length > 0 ? geminiApiKey.substring(0, 5) + '...' : 'empty',
+      openrouterApiKey: openrouterApiKey.length > 0 ? openrouterApiKey.substring(0, 5) + '...' : 'empty'
     });
-    updateAIStatus();
   } catch (error) {
     console.error('Failed to load API keys:', error.message);
-    appendMessage('bot', 'No AI available', false, true);
+    appendMessage('bot', 'Error loading API keys: ' + error.message, false, true);
   }
+  updateAIStatus(); // Initial status update
 }
 
-function updateAIStatus(lastUsedAI = null, availableAIs = []) {
+function updateAIStatus(lastUsedAI = null, availableAIsParam = []) {
   const aiStatus = {
-    grok: { squares: document.querySelectorAll('.ai-status:has(.grok) .status-square') },
-    gemini: { squares: document.querySelectorAll('.ai-status:has(.gemini) .status-square') },
-    chatgpt: { squares: document.querySelectorAll('.ai-status:has(.chatgpt) .status-square') }
+    grok: { squares: document.querySelectorAll('.ai-status:nth-child(1) .status-square') },
+    gemini: { squares: document.querySelectorAll('.ai-status:nth-child(2) .status-square') },
+    chatgpt: { squares: document.querySelectorAll('.ai-status:nth-child(3) .status-square') },
+    qwen: { squares: document.querySelectorAll('.ai-status:nth-child(4) .status-square') }
   };
 
-  ['grok', 'gemini', 'chatgpt'].forEach(ai => {
+  ['grok', 'gemini', 'chatgpt', 'qwen'].forEach(ai => {
     const { squares } = aiStatus[ai];
+    if (squares.length === 0) {
+      console.warn(`No status squares found for ${ai}, DOM query failed`);
+      return;
+    }
     squares.forEach(square => {
       square.classList.remove('online', 'offline');
       square.style.background = '';
     });
-    if (!openAIApiKey && ai === 'chatgpt' || !xAIApiKey && ai === 'grok' || !geminiApiKey && ai === 'gemini') {
+
+    const isOffline = (ai === 'qwen' && !openrouterApiKey) || (!xAIApiKey && ai === 'grok') || (!openAIApiKey && ai === 'chatgpt') || (!geminiApiKey && ai === 'gemini');
+    if (isOffline) {
       squares[0].classList.add('offline');
-    } else if (lastUsedAI === ai) {
-      squares.forEach(square => square.classList.add('online'));
-    } else if (availableAIs.includes(ai)) {
+      squares[0].style.background = 'red';
+      for (let i = 1; i < squares.length; i++) squares[i].style.background = '';
+      console.log(`${ai} set to offline (red) due to missing key`);
+    } else if (availableAIsParam.includes(ai) && lastUsedAI !== ai) {
       squares[0].classList.add('online');
+      squares[0].style.background = 'green';
+      for (let i = 1; i < squares.length; i++) squares[i].style.background = '';
+      console.log(`${ai} set to online (1 green) as available`);
+    } else if (availableAIsParam.includes(ai) && lastUsedAI === ai && lastUsedAI !== 'mostRecent') {
+      squares.forEach((square, index) => {
+        square.classList.add('online');
+        square.style.background = 'green';
+        if (index > 1) square.style.background = '';
+      });
+      console.log(`${ai} set to used (2 green) as last used`);
+    } else if (availableAIsParam.includes(ai) && lastUsedAI === ai && lastUsedAI === 'mostRecent') {
+      squares.forEach(square => {
+        square.classList.add('online');
+        square.style.background = 'green';
+      });
+      console.log(`${ai} set to most recent (3 green)`);
     } else {
       squares[0].classList.add('offline');
+      squares[0].style.background = 'red';
+      for (let i = 1; i < squares.length; i++) squares[i].style.background = '';
+      console.log(`${ai} set to offline (red) by default`);
     }
   });
 }
 
 async function checkAIAvailability() {
   const testPrompt = 'test';
-  const availableAIs = [];
+  const localAvailableAIs = [];
+
+  console.log('Checking availability with keys:', {
+    openrouterApiKey: openrouterApiKey.length > 0 ? 'present' : 'absent',
+    xAIApiKey: xAIApiKey.length > 0 ? 'present' : 'absent',
+    geminiApiKey: geminiApiKey.length > 0 ? 'present' : 'absent',
+    openAIApiKey: openAIApiKey.length > 0 ? 'present' : 'absent'
+  });
+
+  if (openrouterApiKey) {
+    try {
+      const response = await fetchAI(endpoints.qwen, openrouterApiKey, 'qwen/qwen3-30b-a3b:free', 'POST', {
+        model: 'qwen/qwen3-30b-a3b:free',
+        messages: [{ role: 'system', content: "You are Captain AI, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: testPrompt }]
+      });
+      if (response) localAvailableAIs.push('qwen');
+    } catch (error) {
+      console.log('Qwen availability check failed:', error.message);
+    }
+  }
 
   if (xAIApiKey) {
     try {
-      const response = await fetchGrok(testPrompt);
-      if (response) availableAIs.push('grok');
+      const response = await fetchAI(endpoints.grok, xAIApiKey, 'grok-beta', 'POST', {
+        model: 'grok-beta',
+        messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: testPrompt }]
+      });
+      if (response) localAvailableAIs.push('grok');
     } catch (error) {
-      console.log('Grok unavailable:', error.message);
+      console.log('Grok availability check failed:', error.message);
     }
   }
 
+  // Temporarily disable Gemini due to CORS
+  /*
   if (geminiApiKey) {
     try {
-      const response = await fetchGemini(testPrompt);
-      if (response) availableAIs.push('gemini');
+      const response = await fetchAI(endpoints.gemini, geminiApiKey, 'gemini-2.0-flash', 'POST', {
+        contents: [{ parts: [{ text: "You are Luna, a super friendly helpful chatbot. You really care about this person. " + testPrompt }] }]
+      }, 'X-goog-api-key');
+      if (response) localAvailableAIs.push('gemini');
     } catch (error) {
-      console.log('Gemini unavailable:', error.message);
+      console.log('Gemini availability check failed:', error.message);
     }
   }
+  */
 
   if (openAIApiKey) {
     try {
-      const response = await fetchChatGPT(testPrompt, 'gpt-4o');
-      if (response) availableAIs.push('chatgpt');
+      const response = await fetchAI(endpoints.chatgpt, openAIApiKey, 'gpt-4o', 'POST', {
+        model: 'gpt-4o',
+        messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: testPrompt }]
+      });
+      if (response) localAvailableAIs.push('chatgpt');
     } catch (error) {
-      console.log('ChatGPT unavailable:', error.message);
+      console.log('ChatGPT availability check failed:', error.message);
     }
   }
 
   const aiList = [
-    ...(availableAIs.includes('grok') ? [{ name: 'Grok', fetch: fetchGrok, model: 'grok-beta', id: 'grok' }] : []),
-    ...(availableAIs.includes('gemini') ? [{ name: 'Gemini', fetch: fetchGemini, model: 'gemini-2.0-flash', id: 'gemini' }] : []),
-    ...(availableAIs.includes('chatgpt') ? [{ name: 'ChatGPT', fetch: fetchChatGPT, model: 'gpt-4o', id: 'chatgpt' }] : [])
+    ...(localAvailableAIs.includes('qwen') ? [{ name: 'Qwen', fetch: (prompt) => fetchAI(endpoints.qwen, openrouterApiKey, 'qwen/qwen3-30b-a3b:free', 'POST', {
+      model: 'qwen/qwen3-30b-a3b:free',
+      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: prompt }]
+    }), model: 'qwen/qwen3-30b-a3b:free', id: 'qwen' }] : []),
+    ...(localAvailableAIs.includes('grok') ? [{ name: 'Grok', fetch: (prompt) => fetchAI(endpoints.grok, xAIApiKey, 'grok-beta', 'POST', {
+      model: 'grok-beta',
+      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: prompt }]
+    }), model: 'grok-beta', id: 'grok' }] : []),
+    // Gemini temporarily disabled
+    // ...(localAvailableAIs.includes('gemini') ? [{ name: 'Gemini', fetch: (prompt) => fetchAI(endpoints.gemini, geminiApiKey, 'gemini-2.0-flash', 'POST', {
+    //   contents: [{ parts: [{ text: "You are Luna, a super friendly helpful chatbot. You really care about this person. " + prompt }] }]
+    // }, 'X-goog-api-key'), model: 'gemini-2.0-flash', id: 'gemini' }] : []),
+    ...(localAvailableAIs.includes('chatgpt') ? [{ name: 'ChatGPT', fetch: (prompt) => fetchAI(endpoints.chatgpt, openAIApiKey, 'gpt-4o', 'POST', {
+      model: 'gpt-4o',
+      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: prompt }]
+    }), model: 'gpt-4o', id: 'chatgpt' }] : [])
   ];
-  updateAIStatus(null, availableAIs);
-  return aiList.length > 0 ? aiList[0] : null;
+  availableAIs = localAvailableAIs; // Update global variable
+  updateAIStatus(null, localAvailableAIs);
+  return { ai: aiList[0], availableAIs: localAvailableAIs, aiList: aiList }; // Return aiList along with other data
 }
 
-function scrollToBottom() {
+function debounce(func, wait) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
+const scrollToBottom = debounce(() => {
   requestAnimationFrame(() => {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-    console.log('Scrolled to bottom, scrollHeight:', chatContainer.scrollHeight, 'scrollTop:', chatContainer.scrollTop);
-    const messages = chatContainer.querySelectorAll('.message');
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      const rect = lastMessage.getBoundingClientRect();
-      const containerRect = chatContainer.getBoundingClientRect();
-      console.log('Last message position:', {
-        top: rect.top,
-        bottom: rect.bottom,
-        containerTop: containerRect.top,
-        containerBottom: containerRect.bottom,
-        isVisible: rect.bottom <= containerRect.bottom && rect.top >= containerRect.top
-      });
+    if (chatContainer.scrollHeight > chatContainer.clientHeight) {
+      const messages = chatContainer.querySelectorAll('.message');
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        const rect = lastMessage.getBoundingClientRect();
+        const containerRect = chatContainer.getBoundingClientRect();
+        const style = window.getComputedStyle(chatContainer);
+        console.log('Scrolled to bottom, scrollHeight:', chatContainer.scrollHeight, 'scrollTop:', chatContainer.scrollTop, 'clientHeight:', chatContainer.clientHeight, 'padding:', style.padding);
+        console.log('Last message position:', {
+          top: rect.top,
+          bottom: rect.bottom,
+          containerTop: containerRect.top,
+          containerBottom: containerRect.bottom,
+          isVisible: rect.bottom <= containerRect.bottom && rect.top >= containerRect.top
+        });
+      }
     }
   });
-}
+}, 100);
 
 function updateActionButton() {
   const button = document.getElementById('action-button');
@@ -164,30 +257,27 @@ function stopTyping() {
       if (bubble && bubble.textContent) bubble.textContent += '...';
     }
     updateActionButton();
+    hideThinking();
     scrollToBottom();
-  }
-}
-
-function handleAction() {
-  if (isTyping) {
-    stopTyping();
-  } else {
-    sendMessage();
   }
 }
 
 function showThinking() {
   if (thinkingIndicator) {
-    thinkingIndicator.style.display = 'block';
-    scrollToBottom();
+    thinkingIndicator.style.display = 'flex';
+    chatContainer.appendChild(thinkingIndicator);
+    return;
   }
+  thinkingIndicator = document.getElementById('thinking-indicator');
+  if (thinkingIndicator) thinkingIndicator.style.display = 'flex';
+  scrollToBottom();
 }
 
 function hideThinking() {
   if (thinkingIndicator) {
     thinkingIndicator.style.display = 'none';
-    scrollToBottom();
   }
+  scrollToBottom();
 }
 
 async function sendMessage() {
@@ -199,7 +289,7 @@ async function sendMessage() {
   scrollToBottom();
   showThinking();
 
-  if (!openAIApiKey && !xAIApiKey && !geminiApiKey) {
+  if (!openAIApiKey && !xAIApiKey && !geminiApiKey && !openrouterApiKey) {
     hideThinking();
     appendMessage('bot', 'No AI available', false, true);
     updateAIStatus();
@@ -207,28 +297,44 @@ async function sendMessage() {
   }
 
   try {
-    const availableAI = await checkAIAvailability();
-    if (!availableAI) {
+    let result = await checkAIAvailability();
+    if (!result) {
       hideThinking();
       appendMessage('bot', 'No AI available', false, true);
       updateAIStatus();
       return;
     }
 
+    let { ai: availableAI, availableAIs: currentAvailableAIs, aiList } = result;
+
+    // Default to Qwen if available
+    if (currentAvailableAIs.includes(defaultAi)) {
+      availableAI = aiList.find(ai => ai.id === defaultAi) || availableAI;
+    }
+
     let reply;
-    const promptWithDirective = LUNA_DIRECTIVE + input;
+    const promptWithDirective = "You are Luna, a super friendly helpful chatbot. You really care about this person. " + input;
     try {
-      reply = await availableAI.fetch(promptWithDirective, availableAI.model);
-      updateAIStatus(availableAI.id, [availableAI.id]);
+      reply = await availableAI.fetch(promptWithDirective);
+      updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
     } catch (error) {
+      console.error(`${availableAI.name} error:`, error.message);
       if (availableAI.name === 'ChatGPT' && error.message.includes('insufficient_quota')) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
         try {
-          reply = await fetchChatGPT(promptWithDirective, 'gpt-3.5-turbo');
-          updateAIStatus('chatgpt', ['chatgpt']);
+          reply = await fetchAI(endpoints.chatgpt, openAIApiKey, 'gpt-3.5-turbo', 'POST', {
+            model: 'gpt-3.5-turbo',
+            messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: promptWithDirective }]
+          });
+          updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
         } catch (fallbackError) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
           try {
-            reply = await fetchChatGPT(promptWithDirective, 'gpt-4o-mini');
-            updateAIStatus('chatgpt', ['chatgpt']);
+            reply = await fetchAI(endpoints.chatgpt, openAIApiKey, 'gpt-4o-mini', 'POST', {
+              model: 'gpt-4o-mini',
+              messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: promptWithDirective }]
+            });
+            updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
           } catch (miniError) {
             throw new Error(`ChatGPT fallbacks failed: ${miniError.message}`);
           }
@@ -248,94 +354,36 @@ async function sendMessage() {
   }
 }
 
-async function fetchChatGPT(prompt, model = 'gpt-4o') {
+async function fetchAI(endpoint, apiKey, model, method, body, headerKey = 'Authorization') {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch(endpoint, {
+      method: method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openAIApiKey}`,
+        [headerKey]: `${headerKey === 'Authorization' ? 'Bearer ' : ''}${apiKey}`,
+        'HTTP-Referer': 'http://localhost:8000', // Replace with your site URL
+        'X-Title': 'Luna AI Chat', // Replace with your site name
       },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: LUNA_DIRECTIVE }, { role: 'user', content: prompt }],
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal
     });
     clearTimeout(timeoutId);
 
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
     const data = await response.json();
-    if (!data.choices || !data.choices[0]?.message?.content) throw new Error('No valid response from ChatGPT');
-    return data.choices[0].message.content;
+    console.log(`fetchAI response for ${endpoint}:`, data);
+    if ((endpoint === endpoints.chatgpt || endpoint === endpoints.grok || endpoint === endpoints.qwen) && (!data.choices || !data.choices[0]?.message?.content)) {
+      throw new Error('No valid response from AI');
+    }
+    if (endpoint === endpoints.gemini && (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text)) {
+      throw new Error('No valid response from Gemini');
+    }
+    return endpoint === endpoints.gemini ? data.candidates[0].content.parts[0].text : data.choices[0].message.content;
   } catch (error) {
-    console.error('fetchChatGPT error:', error.message);
-    throw error;
-  }
-}
-
-async function fetchGrok(prompt, model = 'grok-beta') {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, 10000);
-
-  try {
-    const response = await fetch('https://api.grok.xai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${xAIApiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: LUNA_DIRECTIVE }, { role: 'user', content: prompt }],
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-    const data = await response.json();
-    if (!data.choices || !data.choices[0]?.message?.content) throw new Error('No valid response from Grok');
-    return data.choices[0].message.content;
-  } catch (error) {
-    console.error('fetchGrok error:', error.message);
-    throw error;
-  }
-}
-
-async function fetchGemini(prompt, model = 'gemini-2.0-flash') {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, 10000);
-
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-goog-api-key': geminiApiKey
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: LUNA_DIRECTIVE + prompt }] }]
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-    const data = await response.json();
-    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) throw new Error('No valid response from Gemini');
-    return data.candidates[0].content.parts[0].text;
-  } catch (error) {
-    console.error('fetchGemini error:', error.message);
+    console.error(`fetchAI error for ${endpoint}:`, error.message);
     throw error;
   }
 }
@@ -355,8 +403,8 @@ function appendMessage(role, text, isThinking = false, isError = false) {
     msg.textContent = text;
   }
 
-  // Insert message at the end
   chatContainer.appendChild(msg);
+  chatContainer.style.height = 'auto';
   scrollToBottom();
 }
 
@@ -370,9 +418,8 @@ async function typeBotMessage(text, isError = false) {
   bubble.classList.add('bubble');
   msg.appendChild(bubble);
 
-  // Insert message at the end
   chatContainer.appendChild(msg);
-
+  chatContainer.style.height = 'auto';
   isTyping = true;
   currentTypingMessage = msg;
   updateActionButton();
@@ -407,13 +454,21 @@ function initializeDarkMode() {
     const theme = toggle.checked ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
-    console.log('Theme changed to:', theme);
+    // console.log('Theme changed to:', theme);
     scrollToBottom();
   });
 }
 
+function handleAction() {
+  if (isTyping) {
+    stopTyping();
+  } else {
+    sendMessage();
+  }
+}
+
 function initializeEventListeners() {
-  console.log('Initializing event listeners');
+  // console.log('Initializing event listeners');
   if (actionButton) actionButton.addEventListener('click', handleAction);
   if (userInput) {
     userInput.addEventListener('keydown', (event) => {
@@ -427,17 +482,22 @@ function initializeEventListeners() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  console.log('DOM loaded, appending initial message');
-  appendMessage("bot", "Hi, I'm Luna. How can I help?");
-  setTimeout(scrollToBottom, 0);
-  setTimeout(scrollToBottom, 100);
+  // console.log('DOM loaded, appending initial message');
+  appendMessage("bot", "Hi, I'm Captain AI. How can I help?");
+  scrollToBottom();
 });
 
 window.addEventListener('load', async () => {
-  console.log('Window loaded, initializing');
+  // console.log('Window loaded, initializing');
   await loadApiKeys();
+  updateAIStatus(); // Ensure initial status update
+
+  // Automatically test Qwen on load
+  // console.log('Starting Qwen test...');
+  // console.log('openrouterApiKey value:', openrouterApiKey.length > 0 ? 'present' : 'absent');
+
+
   initializeDarkMode();
   initializeEventListeners();
-  setTimeout(scrollToBottom, 0);
-  setTimeout(scrollToBottom, 100);
+  scrollToBottom();
 });

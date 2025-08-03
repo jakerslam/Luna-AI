@@ -1,4 +1,43 @@
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -16,15 +55,7 @@
                 <span class="slider"></span>
             </label>
         </div>
-        <div id="chat-container">
-            <div id="filler"></div>
-            <div id="thinking-indicator">
-                <span class="thinking-dot"></span>
-                <span class="thinking-dot"></span>
-                <span class="thinking-dot"></span>
-            </div>
-
-        </div>
+        <div id="chat-container"></div>
         <div id="input-container">
             <input type="text" id="user-input" placeholder="Type your message...">
             <button id="action-button">
@@ -61,17 +92,6 @@
                     <span class="ai-icon chatgpt">
                         <img src="/assets/chatgpt-logo.svg" alt="ChatGPT" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';console.log('ChatGPT logo failed to load');">
                         <span class="text-fallback" style="display: none;">C</span>
-                    </span>
-                    <div class="status-squares">
-                        <span class="status-square"></span>
-                        <span class="status-square"></span>
-                        <span class="status-square"></span>
-                    </div>
-                </div>
-                <div class="ai-status">
-                    <span class="ai-icon qwen">
-                        <img src="/assets/qwen-logo.svg" alt="Qwen" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';console.log('Qwen logo failed to load');">
-                        <span class="text-fallback" style="display: none;">Q</span>
                     </span>
                     <div class="status-squares">
                         <span class="status-square"></span>

@@ -78,7 +78,6 @@ html, body {
     flex-direction: column;
     overflow: hidden;
     transition: background 0.3s ease, box-shadow 0.3s ease;
-    position: relative;
 }
 
 /* Chat Header */
@@ -178,15 +177,27 @@ input:not(:checked) + .slider::after {
 
 /* Chat Box Area */
 #chat-container {
-    flex: 1;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    height: 400px;
+    flex: 1;
     padding: 20px;
     gap: 10px;
+    position: relative;
+
     background: var(--chat-bg);
     border-bottom: 1px solid var(--input-border);
+    justify-content: flex-end;
 }
+
+/* #chat-container::after {
+    content: '';
+    display: block;
+    height: 100%;
+    float: left;
+    clear: both;
+  } */
 
 /* Input Container */
 #input-container {
@@ -231,7 +242,6 @@ input:not(:checked) + .slider::after {
     align-items: center;
     justify-content: center;
     border-radius: 6px;
-    background: var(--fallback-bg);
 }
 
 .ai-icon img {
@@ -247,6 +257,18 @@ input:not(:checked) + .slider::after {
     background: var(--fallback-bg);
     line-height: 24px;
     text-align: center;
+}
+
+.ai-icon.grok {
+    background: #1e90ff;
+}
+
+.ai-icon.gemini {
+    background: #34c759;
+}
+
+.ai-icon.chatgpt {
+    background: #10a37f;
 }
 
 .status-squares {
@@ -274,11 +296,17 @@ input:not(:checked) + .slider::after {
     flex-grow: 1;
 }
 
+#bottom-spacer {
+    display: none;
+}
+
 /* Thinking Indicator */
 #thinking-indicator {
     display: none;
-    flex-shrink: 0;
-    padding: 8px 0;
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    z-index: 10;
 }
 
 .thinking-dot {
@@ -315,8 +343,6 @@ input:not(:checked) + .slider::after {
     word-wrap: break-word;
     font-size: 16px;
     line-height: 1.4;
-    flex-shrink: 0;
-    min-height: 0;
 }
 
 .user {
@@ -344,6 +370,33 @@ input:not(:checked) + .slider::after {
     color: var(--error-text);
     font-size: 14.4px;
 }
+
+.ai-statuses {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+  }
+  
+  .ai-status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  
+  .status-square {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  
+  .online {
+    background: green;
+  }
+  
+  .offline {
+    background: red;
+  }
 
 /* Input Section */
 #user-input {
@@ -400,7 +453,8 @@ input:not(:checked) + .slider::after {
         max-height: calc(90vh - 100px);
     }
     #thinking-indicator {
-        padding: 8px 0;
+        bottom: 16px;
+        left: 10px;
     }
     #ai-status-container {
         gap: 18px;
