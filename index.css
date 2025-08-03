@@ -19,6 +19,8 @@
     --status-online: #28a745;
     --status-default: #888;
     --fallback-bg: #0078ff;
+    --scroll-to-bottom:#1e90ff;
+    --scroll-to-bottom-hover:#005ecb
 }
 
 [data-theme="dark"] {
@@ -41,6 +43,9 @@
     --status-online: #34c759;
     --status-default: #666;
     --fallback-bg: #1e90ff;
+    --scroll-to-bottom:#1e90ff;
+    --scroll-to-bottom:#505050;
+    --scroll-to-bottom-hover:#404040;
 }
 
 /* Optimize rendering */
@@ -427,7 +432,7 @@ input:not(:checked) + .slider::after {
     width: 25px;
     height: 25px;
     border-radius: 50%;
-    background: #505050;
+    background: var( --scroll-to-bottom);
     border: none;
     cursor: pointer;
     display: flex;
@@ -438,7 +443,7 @@ input:not(:checked) + .slider::after {
 }
 
 .fixed-button:hover {
-    background: #404040; /* Optional darker hover state */
+    background: var( --scroll-to-bottom-hover); /* Optional darker hover state */
 }
 
 .fixed-button svg {
