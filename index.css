@@ -410,6 +410,42 @@ input:not(:checked) + .slider::after {
     z-index: -1;
 }
 
+.chat-wrapper {
+    position: relative; /* Ensure a positioning context if needed */
+}
+
+#chat-container {
+    position: relative; /* Maintain context for internal elements */
+    overflow-y: auto; /* Preserve scrollability */
+}
+
+.fixed-button {
+    position: fixed; /* Anchor to viewport to prevent scrolling */
+    bottom: calc(var(--input-container-height, 60px) + 60px); /* 10px above #input-container top */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: #505050;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10; /* Ensure it stays above scrollable content */
+    transition: opacity 3s linear;
+}
+
+.fixed-button:hover {
+    background: #404040; /* Optional darker hover state */
+}
+
+.fixed-button svg {
+    width: 20px; /* Adjusted for smaller button size */
+    height: 20px;
+}
+
 /* Mobile Responsive */
 @media (max-width: 640px) {
     .chat-wrapper {

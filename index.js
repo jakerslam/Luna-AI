@@ -187,9 +187,9 @@ function debounce(func, wait) {
 }
 
 function scrollToBottom() {
-  requestAnimationFrame(() => {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-  });
+    requestAnimationFrame(() => {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    });
 }
 
 function updateActionButton() {
@@ -455,13 +455,24 @@ function initializeEventListeners() {
       }
     });
   }
+  const scrollButton = document.getElementById('scroll-to-bottom');
+  if (scrollButton) {
+    scrollButton.addEventListener('click', scrollToBottom);
+  }
 }
 
 function displayVersion() {
   const versionElement = document.createElement('div');
   versionElement.className = 'version';
-  versionElement.textContent = 'Version 1.0.1';
+  versionElement.textContent = 'Version 1.0.1'; // Updated to 1.0.1
   document.querySelector('.chat-wrapper').appendChild(versionElement);
+}
+
+function updateScrollButton() {
+  const scrollButton = document.getElementById('scroll-to-bottom');
+  if (!scrollButton) return;
+  const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop <= chatContainer.clientHeight + 10;
+  scrollButton.style.display = isAtBottom ? 'none' : 'flex';
 }
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -478,4 +489,6 @@ window.addEventListener('load', async () => {
 
   initializeDarkMode();
   initializeEventListeners();
+  chatContainer.addEventListener('scroll', debounce(updateScrollButton, 100));
+  updateScrollButton(); // Initial check
 });
