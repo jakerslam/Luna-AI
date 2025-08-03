@@ -19,8 +19,8 @@
     --status-online: #28a745;
     --status-default: #888;
     --fallback-bg: #0078ff;
-    --scroll-to-bottom:#1e90ff;
-    --scroll-to-bottom-hover:#005ecb
+    --scroll-to-bottom:#8fc4f9;
+    --scroll-to-bottom-hover:#80bdfa;
 }
 
 [data-theme="dark"] {
@@ -90,7 +90,7 @@ html, body {
     position: absolute;
     bottom: 10px;
     right: 20px;
-    color: white; /* Always white */
+    color: var(--bot-text); /* Always white */
     font-size: 12px;
     z-index: 10;
 }

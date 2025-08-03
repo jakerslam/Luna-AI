@@ -464,7 +464,7 @@ function initializeEventListeners() {
 function displayVersion() {
   const versionElement = document.createElement('div');
   versionElement.className = 'version';
-  versionElement.textContent = 'Version 1.0.1'; // Updated to 1.0.1
+  versionElement.textContent = 'Version 1.0.2'; // Updated to 1.0.2
   document.querySelector('.chat-wrapper').appendChild(versionElement);
 }
 
