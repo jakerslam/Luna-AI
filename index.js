@@ -11,6 +11,9 @@ let xAIApiKey = '';
 let geminiApiKey = '';
 let openrouterApiKey = '';
 
+// Initialize chat history
+let chatHistory = [];
+
 const endpoints = {
   grok: 'https://api.x.ai/v1/chat/completions',
   gemini: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
@@ -26,6 +29,9 @@ const availableModels = {
   phi: true,
   qwen: true
 };
+
+// Define AI complexity order (simpler to more complex)
+const aiComplexityOrder = ['phi', 'qwen', 'gemini', 'chatgpt', 'grok'];
 
 async function loadApiKeys() {
   try {
@@ -204,18 +210,18 @@ async function checkAIAvailability() {
   }
 
   const aiList = [
-    ...(localAvailableAIs.includes('qwen') ? [{ name: 'Qwen', fetch: (prompt) => fetchAI(endpoints.qwen, '', 'qwen', 'POST', { model: "qwen3:4b", prompt, stream: false }), id: 'qwen' }] : []),
-    ...(localAvailableAIs.includes('phi') ? [{ name: 'Phi', fetch: (prompt) => fetchAI(endpoints.phi, '', 'phi', 'POST', { model: "phi:latest", prompt, stream: false }), id: 'phi' }] : []),
+    ...(localAvailableAIs.includes('qwen') ? [{ name: 'Qwen', fetch: (prompt) => fetchAI(endpoints.qwen, '', 'qwen', 'POST', { model: "qwen3:4b", prompt: `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'qwen' }] : []),
+    ...(localAvailableAIs.includes('phi') ? [{ name: 'Phi', fetch: (prompt) => fetchAI(endpoints.phi, '', 'phi', 'POST', { model: "phi:latest", prompt: `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'phi' }] : []),
     ...(localAvailableAIs.includes('grok') ? [{ name: 'Grok', fetch: (prompt) => fetchAI(endpoints.grok, xAIApiKey, 'grok-beta', 'POST', {
       model: 'grok-beta',
-      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: prompt }]
+      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}` }]
     }), model: 'grok-beta', id: 'grok' }] : []),
     ...(localAvailableAIs.includes('gemini') ? [{ name: 'Gemini', fetch: (prompt) => fetchAI(endpoints.gemini, geminiApiKey, 'gemini-2.0-flash', 'POST', {
-      contents: [{ parts: [{ text: "You are Luna, a super friendly helpful chatbot. You really care about this person. " + prompt }] }]
+      contents: [{ parts: [{ text: "You are Luna, a super friendly helpful chatbot. You really care about this person. " + `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}` }] }]
     }, 'X-goog-api-key'), model: 'gemini-2.0-flash', id: 'gemini' }] : []),
     ...(localAvailableAIs.includes('chatgpt') ? [{ name: 'ChatGPT', fetch: (prompt) => fetchAI(endpoints.chatgpt, openAIApiKey, 'gpt-4o', 'POST', {
       model: 'gpt-4o',
-      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: prompt }]
+      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}` }]
     }), model: 'gpt-4o', id: 'chatgpt' }] : [])
   ];
   availableAIs = localAvailableAIs;
@@ -320,6 +326,9 @@ async function sendMessage() {
   const input = userInput.value.trim();
   if (!input || isTyping) return;
 
+  // Add user message to chat history
+  chatHistory.push({ role: 'user', message: input });
+  if (chatHistory.length > 5) chatHistory.shift(); // Keep last 5 messages
   appendMessage('user', input);
   userInput.value = '';
   showThinking();
@@ -348,13 +357,39 @@ async function sendMessage() {
 
     let reply;
     const aiListNames = aiList.map(ai => ai.name).join(', ');
-    const promptWithDirective = `You are Luna, a super friendly helpful chatbot. You really care about this person. Available AIs are: ${aiListNames}. If you think this question is better handled by the least powerful AI on the list that can comfortably answer, pass it by responding with "[current AI name] passed this question to [target AI name]". Otherwise, answer the question. Question: ${input}`;
+    const promptWithDirective = `Provide a single, complete response as Luna, with no labeling or passing unless necessary. Assume you’re already known as Luna and skip the greeting unless asked. You are a super friendly helpful chatbot. You really care about this person. Available AIs are: ${aiListNames}. If you are unqualified to answer or a simpler AI can handle this, pass by logging the reason to the console and responding with the pass message. Question: ${input}`;
     try {
       reply = await availableAI.fetch(promptWithDirective);
-      if (reply.includes('passed this question to')) {
-        appendMessage('bot', reply);
+      console.log(`Response from ${availableAI.name}:`, reply);
+      let currentIndex = aiComplexityOrder.indexOf(availableAI.id);
+      let nextSimplerAI = aiList.find(ai => aiComplexityOrder.indexOf(ai.id) < currentIndex && currentAvailableAIs.includes(ai.id));
+      let nextComplexAI = aiList.find(ai => aiComplexityOrder.indexOf(ai.id) > currentIndex && currentAvailableAIs.includes(ai.id));
+
+      if (reply === "" || (nextSimplerAI && availableAI.id !== 'phi')) {
+        if (nextSimplerAI) {
+          console.log(`[Pass] ${availableAI.name} passed to ${nextSimplerAI.name} because a simpler AI can handle it or response was empty`);
+          appendMessage('bot', `[${availableAI.name}] passed this question to [${nextSimplerAI.name}]`);
+          availableAI = nextSimplerAI;
+          reply = await availableAI.fetch(promptWithDirective);
+          if (reply === "" && nextComplexAI) {
+            console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to empty response`);
+            appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
+            availableAI = nextComplexAI;
+            reply = await availableAI.fetch(promptWithDirective);
+          }
+        } else if (nextComplexAI) {
+          console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to empty response or unqualified`);
+          appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
+          availableAI = nextComplexAI;
+          reply = await availableAI.fetch(promptWithDirective);
+        } else {
+          appendMessage('bot', 'Unable to generate a response');
+        }
         hideThinking();
       } else {
+        // Add AI response to chat history
+        chatHistory.push({ role: 'ai', message: reply });
+        if (chatHistory.length > 5) chatHistory.shift();
         updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
         hideThinking();
         await typeBotMessage(reply);
@@ -362,13 +397,20 @@ async function sendMessage() {
     } catch (error) {
       console.error(`${availableAI.name} error:`, error.message);
       hideThinking();
-      if (error.name === 'AbortError') {
-        const partialResponse = await fetchAI(endpoints[availableAI.id], '', availableAI.id, 'POST', { model: availableAI.id === 'qwen' ? "qwen3:4b" : (availableAI.id === 'phi' ? "phi:latest" : availableAI.model), prompt: promptWithDirective, stream: false }, 'Authorization')
-          .catch(() => null);
-        if (partialResponse && partialResponse.includes('<think>')) {
-          appendMessage('bot', `${availableAI.name} took too long to respond`, false, true);
-        } else {
-          appendMessage('bot', 'No AI available', false, true);
+      if (error.name === 'AbortError' && nextComplexAI) {
+        console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to timeout`);
+        appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
+        availableAI = nextComplexAI;
+        try {
+          reply = await availableAI.fetch(promptWithDirective);
+          chatHistory.push({ role: 'ai', message: reply });
+          if (chatHistory.length > 5) chatHistory.shift();
+          updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
+          hideThinking();
+          await typeBotMessage(reply);
+        } catch (fallbackError) {
+          console.error(`${availableAI.name} fallback error:`, fallbackError.message);
+          appendMessage('bot', 'No AI available after timeout', false, true);
         }
       } else if (availableAI.name === 'ChatGPT' && error.message.includes('insufficient_quota')) {
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -377,6 +419,8 @@ async function sendMessage() {
             model: 'gpt-3.5-turbo',
             messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: promptWithDirective }]
           });
+          chatHistory.push({ role: 'ai', message: reply });
+          if (chatHistory.length > 5) chatHistory.shift();
           updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
         } catch (fallbackError) {
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -385,6 +429,8 @@ async function sendMessage() {
               model: 'gpt-4o-mini',
               messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: promptWithDirective }]
             });
+            chatHistory.push({ role: 'ai', message: reply });
+            if (chatHistory.length > 5) chatHistory.shift();
             updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
           } catch (miniError) {
             throw new Error(`ChatGPT fallbacks failed: ${miniError.message}`);
@@ -393,7 +439,7 @@ async function sendMessage() {
         hideThinking();
         await typeBotMessage(reply);
       } else {
-        throw error;
+        appendMessage('bot', 'No AI available after error', false, true);
       }
     }
   } catch (error) {
@@ -407,7 +453,7 @@ async function sendMessage() {
 
 async function fetchAI(endpoint, apiKey, model, method, body, headerKey = 'Authorization') {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
 
   try {
     const response = await fetch(endpoint, {
@@ -527,7 +573,7 @@ function initializeEventListeners() {
 function displayVersion() {
   const versionElement = document.createElement('div');
   versionElement.className = 'version';
-  versionElement.textContent = 'Version 1.1.0'; // Updated to 1.1.0
+  versionElement.textContent = 'Version 1.2.0'; // Updated to 1.2.0
   document.querySelector('.chat-wrapper').appendChild(versionElement);
 }
 
