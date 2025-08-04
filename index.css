@@ -20,7 +20,7 @@
     --status-default: #888;
     --fallback-bg: #0078ff;
     --scroll-to-bottom:#8fc4f9;
-    --scroll-to-bottom-hover:#80bdfa;
+    --scroll-to-bottom-hover:#71b4f8;
 }
 
 [data-theme="dark"] {
@@ -53,6 +53,7 @@ html, body, .chat-wrapper {
     will-change: background, color;
 }
 
+
 /* Reset & Base */
 * {
     box-sizing: border-box;
@@ -70,6 +71,7 @@ html, body {
     justify-content: center;
     transition: background 0.3s ease;
     overflow: hidden; /* Prevent body overflow */
+    transition:linear 0.3s ;
 }
 
 /* Chat Container */
@@ -439,7 +441,6 @@ input:not(:checked) + .slider::after {
     align-items: center;
     justify-content: center;
     z-index: 10; /* Ensure it stays above scrollable content */
-    transition: opacity 3s linear;
 }
 
 .fixed-button:hover {
