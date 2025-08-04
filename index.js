@@ -13,6 +13,7 @@ let openrouterApiKey = '';
 
 // Initialize chat history
 let chatHistory = [];
+let thoughtHistory = [];
 
 const endpoints = {
   grok: 'https://api.x.ai/v1/chat/completions',
@@ -22,16 +23,15 @@ const endpoints = {
   phi: 'http://127.0.0.1:11434/api/generate'
 };
 
-const defaultAi = 'phi';
+const defaultAi = 'qwen';
 let availableAIs = [];
-let lastUsedAI = null; // Track the last AI that responded
+let lastUsedAI = null;
 
 const availableModels = {
   phi: true,
   qwen: true
 };
 
-// Define AI complexity order (simpler to more complex)
 const aiComplexityOrder = ['phi', 'qwen', 'gemini', 'chatgpt', 'grok'];
 
 async function loadApiKeys() {
@@ -126,7 +126,7 @@ function updateAIStatus(lastUsedAIParam = null, availableAIsParam = [], statusTy
       console.log(`${ai} set to offline (red) by default`);
     }
   });
-  if (lastUsedAIParam) lastUsedAI = lastUsedAIParam; // Update lastUsedAI if a new AI is specified
+  if (lastUsedAIParam) lastUsedAI = lastUsedAIParam;
 }
 
 function checkModelFile(modelName) {
@@ -226,6 +226,7 @@ async function checkAIAvailability() {
       messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }]
     }), model: 'gpt-4o', id: 'chatgpt' }] : [])
   ];
+
   availableAIs = localAvailableAIs;
   updateAIStatus(null, localAvailableAIs);
   return { ai: aiList.length > 0 ? aiList[0] : null, availableAIs: localAvailableAIs, aiList: aiList };
@@ -328,9 +329,8 @@ async function sendMessage() {
   const input = userInput.value.trim();
   if (!input || isTyping) return;
 
-  // Add user message to chat history
   chatHistory.push({ role: 'user', message: input, ai: 'user' });
-  if (chatHistory.length > 20) chatHistory.shift(); // Keep last 20 messages
+  if (chatHistory.length > 20) chatHistory.shift();
   appendMessage('user', input);
   userInput.value = '';
   showThinking();
@@ -358,40 +358,48 @@ async function sendMessage() {
     }
 
     let reply;
+    const startTime = Date.now();
     const lastUserMessage = chatHistory.filter(h => h.role === 'user').pop()?.message || '';
-    const promptWithDirective = `Provide a single, complete response as Luna, strictly addressing the user's most recent request (${lastUserMessage}) without introducing new topics, self-identification (e.g., [Luna]), greetings, or obvious statements. Focus only on the requested content. You are a super friendly helpful chatbot who cares about this person. Available AIs are: ${aiList.map(ai => ai.name).join(', ')}. If unqualified or unable to respond directly, pass by logging the reason to the console and responding with '[PASS]'. Question: ${input}`;
+    const promptWithDirective = `Provide a single, complete response strictly addressing the user's most recent request (${lastUserMessage}) without self-identification (e.g., [Luna] or Luna:), greetings, or obvious statements. User chats in the context are to guide the AI to remain coherent and focused on the user's intended task. AI chats are to help the AI avoid repetition, except to provide a summary when appropriate. You are a super friendly. Available AIs are: ${aiList.map(ai => ai.name).join(', ')}. If unqualified, unable to respond directly, or response is empty, pass the query to another AI to finish by logging the reason to the console and responding with '[PASS]'. Question: ${input}`;
     try {
       reply = await availableAI.fetch(promptWithDirective);
       console.log(`Response from ${availableAI.name}:`, reply);
+      const endTime = Date.now();
+      const thoughtTime = (endTime - startTime) / 1000;
+      addThoughtTime(thoughtTime, availableAI.name);
+
       let currentIndex = aiComplexityOrder.indexOf(availableAI.id);
       let nextSimplerAI = aiList.find(ai => aiComplexityOrder.indexOf(ai.id) < currentIndex && currentAvailableAIs.includes(ai.id));
       let nextComplexAI = aiList.find(ai => aiComplexityOrder.indexOf(ai.id) > currentIndex && currentAvailableAIs.includes(ai.id));
 
-      if (reply === "" || reply === "[PASS]" || (nextSimplerAI && availableAI.id !== 'phi')) {
+      if (!reply || reply.trim() === "" || reply === "[PASS]") {
         console.log(`[Debug] Empty or pass response from ${availableAI.name}`);
-        if (nextSimplerAI) {
-          console.log(`[Pass] ${availableAI.name} passed to ${nextSimplerAI.name} because response was empty, a pass, or a simpler AI can handle it`);
-          appendMessage('bot', `[${availableAI.name}] passed this question to [${nextSimplerAI.name}]`);
-          availableAI = nextSimplerAI;
+        if (nextSimplerAI || nextComplexAI) {
+          const nextAI = nextSimplerAI || nextComplexAI;
+          console.log(`[Pass] ${availableAI.name} passed to ${nextAI.name} due to empty or pass response`);
+          appendMessage('bot', `[${availableAI.name}] passed this question to [${nextAI.name}]`);
+          availableAI = nextAI;
+          const passStartTime = Date.now();
           reply = await availableAI.fetch(promptWithDirective);
-          if (reply === "" || reply === "[PASS]") {
+          const passEndTime = Date.now();
+          addThoughtTime((passEndTime - passStartTime) / 1000, availableAI.name);
+          if (!reply || reply.trim() === "" || reply === "[PASS]") {
             console.log(`[Debug] Second empty or pass response from ${availableAI.name}`);
-            if (nextComplexAI) {
-              console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to empty or pass response`);
-              appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
-              availableAI = nextComplexAI;
+            const anotherNextAI = nextComplexAI && nextComplexAI !== nextAI ? nextComplexAI : (aiList.find(ai => ai.id !== availableAI.id && currentAvailableAIs.includes(ai.id)) || null);
+            if (anotherNextAI) {
+              console.log(`[Pass] ${availableAI.name} passed to ${anotherNextAI.name} due to empty or pass response`);
+              appendMessage('bot', `[${availableAI.name}] passed this question to [${anotherNextAI.name}]`);
+              availableAI = anotherNextAI;
+              const secondPassStartTime = Date.now();
               reply = await availableAI.fetch(promptWithDirective);
+              const secondPassEndTime = Date.now();
+              addThoughtTime((secondPassEndTime - secondPassStartTime) / 1000, availableAI.name);
             } else {
               appendMessage('bot', 'Unable to generate a response after multiple attempts');
               hideThinking();
               return;
             }
           }
-        } else if (nextComplexAI) {
-          console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to empty, pass, or unqualified response`);
-          appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
-          availableAI = nextComplexAI;
-          reply = await availableAI.fetch(promptWithDirective);
         } else {
           appendMessage('bot', 'Unable to generate a response');
           hideThinking();
@@ -399,12 +407,11 @@ async function sendMessage() {
         }
       }
 
-      // Add AI response to chat history with the AI that responded
       chatHistory.push({ role: 'ai', message: reply, ai: availableAI.name });
       if (chatHistory.length > 20) chatHistory.shift();
       updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
       hideThinking();
-      await typeBotMessage(reply);
+      await typeBotMessage(reply.trim());
     } catch (error) {
       console.error(`${availableAI.name} error:`, error.message);
       hideThinking();
@@ -413,12 +420,15 @@ async function sendMessage() {
         appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
         availableAI = nextComplexAI;
         try {
+          const passStartTime = Date.now();
           reply = await availableAI.fetch(promptWithDirective);
+          const passEndTime = Date.now();
+          addThoughtTime((passEndTime - passStartTime) / 1000, availableAI.name);
           chatHistory.push({ role: 'ai', message: reply, ai: availableAI.name });
           if (chatHistory.length > 20) chatHistory.shift();
           updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
           hideThinking();
-          await typeBotMessage(reply);
+          await typeBotMessage(reply.trim());
         } catch (fallbackError) {
           console.error(`${availableAI.name} fallback error:`, fallbackError.message);
           appendMessage('bot', 'No AI available after timeout', false, true);
@@ -426,20 +436,26 @@ async function sendMessage() {
       } else if (availableAI.name === 'ChatGPT' && error.message.includes('insufficient_quota')) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         try {
+          const passStartTime = Date.now();
           reply = await fetchAI(endpoints.chatgpt, openAIApiKey, 'gpt-3.5-turbo', 'POST', {
             model: 'gpt-3.5-turbo',
             messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: promptWithDirective }]
           });
+          const passEndTime = Date.now();
+          addThoughtTime((passEndTime - passStartTime) / 1000, 'ChatGPT');
           chatHistory.push({ role: 'ai', message: reply, ai: 'ChatGPT' });
           if (chatHistory.length > 20) chatHistory.shift();
           updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
         } catch (fallbackError) {
           await new Promise(resolve => setTimeout(resolve, 2000));
           try {
+            const passStartTime = Date.now();
             reply = await fetchAI(endpoints.chatgpt, openAIApiKey, 'gpt-4o-mini', 'POST', {
               model: 'gpt-4o-mini',
               messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: promptWithDirective }]
             });
+            const passEndTime = Date.now();
+            addThoughtTime((passEndTime - passStartTime) / 1000, 'ChatGPT');
             chatHistory.push({ role: 'ai', message: reply, ai: 'ChatGPT' });
             if (chatHistory.length > 20) chatHistory.shift();
             updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
@@ -448,7 +464,7 @@ async function sendMessage() {
           }
         }
         hideThinking();
-        await typeBotMessage(reply);
+        await typeBotMessage(reply.trim());
       } else {
         appendMessage('bot', 'No AI available after error', false, true);
       }
@@ -464,8 +480,7 @@ async function sendMessage() {
 
 async function fetchAI(endpoint, apiKey, model, method, body, headerKey = 'Authorization') {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
-
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
   try {
     const response = await fetch(endpoint, {
       method: method,
@@ -504,15 +519,29 @@ function appendMessage(role, text, isThinking = false, isError = false) {
   if (role === 'bot') {
     const bubble = document.createElement('div');
     bubble.classList.add('bubble');
-    bubble.textContent = text;
+    bubble.textContent = text.trim();
     if (isThinking) bubble.classList.add('dots');
     msg.appendChild(bubble);
   } else {
-    msg.textContent = text;
+    msg.textContent = text.trim();
     scrollToBottom();
   }
 
   chatContainer.appendChild(msg);
+}
+
+function addThoughtTime(thoughtTime, aiName) {
+  thoughtHistory.push({ time: thoughtTime.toFixed(2), ai: aiName, timestamp: new Date().toLocaleTimeString() });
+  if (thoughtHistory.length > 20) thoughtHistory.shift();
+
+  const lastThought = thoughtHistory[thoughtHistory.length - 1];
+  if (lastThought) {
+    const thoughtMsg = document.createElement('div');
+    thoughtMsg.classList.add('message', 'bot', 'thought-time');
+    thoughtMsg.textContent = `[${lastThought.timestamp}] ${lastThought.ai} thought for ${lastThought.time} seconds`;
+    chatContainer.appendChild(thoughtMsg);
+    scrollToBottom();
+  }
 }
 
 async function typeBotMessage(text, isError = false) {
@@ -523,6 +552,7 @@ async function typeBotMessage(text, isError = false) {
   if (isError) msg.classList.add('error');
   const bubble = document.createElement('div');
   bubble.classList.add('bubble');
+  bubble.textContent = '';
   msg.appendChild(bubble);
 
   chatContainer.appendChild(msg);
@@ -533,8 +563,13 @@ async function typeBotMessage(text, isError = false) {
   currentTypingTimeouts = [];
   for (let i = 0; i < text.length; i++) {
     if (!isTyping) break;
-    const timeout = setTimeout(() => bubble.textContent += text.charAt(i), i * 15);
-    currentTypingTimeouts.push(timeout);
+    const char = text.charAt(i);
+    if (char.trim() || i === text.length - 1) {
+      const timeout = setTimeout(() => {
+        bubble.textContent = text.substring(0, i + 1).trim();
+      }, i * 15);
+      currentTypingTimeouts.push(timeout);
+    }
   }
 
   const totalTime = text.length * 15;
@@ -614,7 +649,7 @@ window.addEventListener('load', async () => {
   console.log('Window loaded, initializing');
   await loadApiKeys();
   updateAIStatus();
-  updateAIStatus('phi', ['phi'], 'mostRecent');
+  updateAIStatus('qwen', ['qwen'], 'mostRecent');
 
   initializeDarkMode();
   initializeEventListeners();

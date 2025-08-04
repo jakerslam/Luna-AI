@@ -452,6 +452,32 @@ input:not(:checked) + .slider::after {
     height: 20px;
 }
 
+/* #thought-log-container {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 200px;
+    height: 150px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px;
+    border-radius: 5px;
+    z-index: 1000;
+  } */
+  .thought-entry {
+    font-size: 0.75em;
+    margin-bottom: 2px;
+    color: var(--bot-text);
+  }
+
+  .thought-time {
+    margin-left: 20px;
+    font-size: 0.8em; /* Slightly smaller */
+    color: #afafaf; /* Light gray */
+    padding: 2px 0;
+  }
+
 /* Mobile Responsive */
 @media (max-width: 640px) {
     .chat-wrapper {
