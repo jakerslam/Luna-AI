@@ -24,6 +24,7 @@ const endpoints = {
 
 const defaultAi = 'phi';
 let availableAIs = [];
+let lastUsedAI = null; // Track the last AI that responded
 
 const availableModels = {
   phi: true,
@@ -55,7 +56,7 @@ async function loadApiKeys() {
   updateAIStatus();
 }
 
-function updateAIStatus(lastUsedAI = null, availableAIsParam = []) {
+function updateAIStatus(lastUsedAIParam = null, availableAIsParam = [], statusType = null) {
   const aiStatus = {
     grok: { squares: document.querySelectorAll('.ai-status:nth-child(1) .status-square') },
     gemini: { squares: document.querySelectorAll('.ai-status:nth-child(2) .status-square') },
@@ -82,9 +83,9 @@ function updateAIStatus(lastUsedAI = null, availableAIsParam = []) {
       if (isLocalUsed && (lastUsedAI === 'qwen' || lastUsedAI === 'phi')) {
         squares.forEach((square, index) => {
           square.classList.add('online');
-          square.style.background = index === 0 || index === 1 ? 'green' : '';
+          square.style.background = index < 3 ? 'green' : '';
         });
-        console.log('local set to used (2 green) as local AI was last used');
+        console.log('local set to used (3 green) as local AI was last used');
       } else if (isLocalUsed) {
         squares[0].classList.add('online');
         squares[0].style.background = 'green';
@@ -101,21 +102,21 @@ function updateAIStatus(lastUsedAI = null, availableAIsParam = []) {
       squares[0].style.background = 'red';
       for (let i = 1; i < squares.length; i++) squares[i].style.background = '';
       console.log(`${ai} set to offline (red) due to missing key or file`);
-    } else if (availableAIsParam.includes(ai) && lastUsedAI !== ai) {
+    } else if (availableAIsParam.includes(ai) && lastUsedAI !== ai && statusType !== 'mostRecent') {
       squares[0].classList.add('online');
       squares[0].style.background = 'green';
       for (let i = 1; i < squares.length; i++) squares[i].style.background = '';
       console.log(`${ai} set to online (1 green) as available`);
-    } else if (availableAIsParam.includes(ai) && lastUsedAI === ai && lastUsedAI !== 'mostRecent') {
+    } else if (availableAIsParam.includes(ai) && (lastUsedAI === ai || (lastUsedAIParam && lastUsedAIParam === ai)) && statusType !== 'mostRecent') {
       squares.forEach((square, index) => {
         square.classList.add('online');
-        square.style.background = index === 0 || index === 1 ? 'green' : '';
+        square.style.background = index < 2 ? 'green' : '';
       });
-      console.log(`${ai} set to used (2 green) as last used`);
-    } else if (availableAIsParam.includes(ai) && lastUsedAI === ai && lastUsedAI === 'mostRecent') {
-      squares.forEach(square => {
+      console.log(`${ai} set to used (2 green) as last used or passed to`);
+    } else if (availableAIsParam.includes(ai) && (lastUsedAI === ai || (lastUsedAIParam && lastUsedAIParam === ai)) && statusType === 'mostRecent') {
+      squares.forEach((square, index) => {
         square.classList.add('online');
-        square.style.background = 'green';
+        square.style.background = index < 3 ? 'green' : '';
       });
       console.log(`${ai} set to most recent (3 green)`);
     } else {
@@ -125,6 +126,7 @@ function updateAIStatus(lastUsedAI = null, availableAIsParam = []) {
       console.log(`${ai} set to offline (red) by default`);
     }
   });
+  if (lastUsedAIParam) lastUsedAI = lastUsedAIParam; // Update lastUsedAI if a new AI is specified
 }
 
 function checkModelFile(modelName) {
@@ -210,18 +212,18 @@ async function checkAIAvailability() {
   }
 
   const aiList = [
-    ...(localAvailableAIs.includes('qwen') ? [{ name: 'Qwen', fetch: (prompt) => fetchAI(endpoints.qwen, '', 'qwen', 'POST', { model: "qwen3:4b", prompt: `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'qwen' }] : []),
-    ...(localAvailableAIs.includes('phi') ? [{ name: 'Phi', fetch: (prompt) => fetchAI(endpoints.phi, '', 'phi', 'POST', { model: "phi:latest", prompt: `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'phi' }] : []),
+    ...(localAvailableAIs.includes('qwen') ? [{ name: 'Qwen', fetch: (prompt) => fetchAI(endpoints.qwen, '', 'qwen', 'POST', { model: "qwen3:4b", prompt: `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'qwen' }] : []),
+    ...(localAvailableAIs.includes('phi') ? [{ name: 'Phi', fetch: (prompt) => fetchAI(endpoints.phi, '', 'phi', 'POST', { model: "phi:latest", prompt: `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'phi' }] : []),
     ...(localAvailableAIs.includes('grok') ? [{ name: 'Grok', fetch: (prompt) => fetchAI(endpoints.grok, xAIApiKey, 'grok-beta', 'POST', {
       model: 'grok-beta',
-      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}` }]
+      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }]
     }), model: 'grok-beta', id: 'grok' }] : []),
     ...(localAvailableAIs.includes('gemini') ? [{ name: 'Gemini', fetch: (prompt) => fetchAI(endpoints.gemini, geminiApiKey, 'gemini-2.0-flash', 'POST', {
-      contents: [{ parts: [{ text: "You are Luna, a super friendly helpful chatbot. You really care about this person. " + `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}` }] }]
+      contents: [{ parts: [{ text: "You are Luna, a super friendly helpful chatbot. You really care about this person. " + `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }] }]
     }, 'X-goog-api-key'), model: 'gemini-2.0-flash', id: 'gemini' }] : []),
     ...(localAvailableAIs.includes('chatgpt') ? [{ name: 'ChatGPT', fetch: (prompt) => fetchAI(endpoints.chatgpt, openAIApiKey, 'gpt-4o', 'POST', {
       model: 'gpt-4o',
-      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${chatHistory.map(h => `${h.role}: ${h.message}`).join('\n')}` }]
+      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }]
     }), model: 'gpt-4o', id: 'chatgpt' }] : [])
   ];
   availableAIs = localAvailableAIs;
@@ -327,8 +329,8 @@ async function sendMessage() {
   if (!input || isTyping) return;
 
   // Add user message to chat history
-  chatHistory.push({ role: 'user', message: input });
-  if (chatHistory.length > 5) chatHistory.shift(); // Keep last 5 messages
+  chatHistory.push({ role: 'user', message: input, ai: 'user' });
+  if (chatHistory.length > 20) chatHistory.shift(); // Keep last 20 messages
   appendMessage('user', input);
   userInput.value = '';
   showThinking();
@@ -356,8 +358,8 @@ async function sendMessage() {
     }
 
     let reply;
-    const aiListNames = aiList.map(ai => ai.name).join(', ');
-    const promptWithDirective = `Provide a single, complete response as Luna, with no labeling or passing unless necessary. Assume you’re already known as Luna and skip the greeting unless asked. You are a super friendly helpful chatbot. You really care about this person. Available AIs are: ${aiListNames}. If you are unqualified to answer or a simpler AI can handle this, pass by logging the reason to the console and responding with the pass message. Question: ${input}`;
+    const lastUserMessage = chatHistory.filter(h => h.role === 'user').pop()?.message || '';
+    const promptWithDirective = `Provide a single, complete response as Luna, strictly addressing the user's most recent request (${lastUserMessage}) without introducing new topics, self-identification (e.g., [Luna]), greetings, or obvious statements. Focus only on the requested content. You are a super friendly helpful chatbot who cares about this person. Available AIs are: ${aiList.map(ai => ai.name).join(', ')}. If unqualified or unable to respond directly, pass by logging the reason to the console and responding with '[PASS]'. Question: ${input}`;
     try {
       reply = await availableAI.fetch(promptWithDirective);
       console.log(`Response from ${availableAI.name}:`, reply);
@@ -365,35 +367,44 @@ async function sendMessage() {
       let nextSimplerAI = aiList.find(ai => aiComplexityOrder.indexOf(ai.id) < currentIndex && currentAvailableAIs.includes(ai.id));
       let nextComplexAI = aiList.find(ai => aiComplexityOrder.indexOf(ai.id) > currentIndex && currentAvailableAIs.includes(ai.id));
 
-      if (reply === "" || (nextSimplerAI && availableAI.id !== 'phi')) {
+      if (reply === "" || reply === "[PASS]" || (nextSimplerAI && availableAI.id !== 'phi')) {
+        console.log(`[Debug] Empty or pass response from ${availableAI.name}`);
         if (nextSimplerAI) {
-          console.log(`[Pass] ${availableAI.name} passed to ${nextSimplerAI.name} because a simpler AI can handle it or response was empty`);
+          console.log(`[Pass] ${availableAI.name} passed to ${nextSimplerAI.name} because response was empty, a pass, or a simpler AI can handle it`);
           appendMessage('bot', `[${availableAI.name}] passed this question to [${nextSimplerAI.name}]`);
           availableAI = nextSimplerAI;
           reply = await availableAI.fetch(promptWithDirective);
-          if (reply === "" && nextComplexAI) {
-            console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to empty response`);
-            appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
-            availableAI = nextComplexAI;
-            reply = await availableAI.fetch(promptWithDirective);
+          if (reply === "" || reply === "[PASS]") {
+            console.log(`[Debug] Second empty or pass response from ${availableAI.name}`);
+            if (nextComplexAI) {
+              console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to empty or pass response`);
+              appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
+              availableAI = nextComplexAI;
+              reply = await availableAI.fetch(promptWithDirective);
+            } else {
+              appendMessage('bot', 'Unable to generate a response after multiple attempts');
+              hideThinking();
+              return;
+            }
           }
         } else if (nextComplexAI) {
-          console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to empty response or unqualified`);
+          console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to empty, pass, or unqualified response`);
           appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
           availableAI = nextComplexAI;
           reply = await availableAI.fetch(promptWithDirective);
         } else {
           appendMessage('bot', 'Unable to generate a response');
+          hideThinking();
+          return;
         }
-        hideThinking();
-      } else {
-        // Add AI response to chat history
-        chatHistory.push({ role: 'ai', message: reply });
-        if (chatHistory.length > 5) chatHistory.shift();
-        updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
-        hideThinking();
-        await typeBotMessage(reply);
       }
+
+      // Add AI response to chat history with the AI that responded
+      chatHistory.push({ role: 'ai', message: reply, ai: availableAI.name });
+      if (chatHistory.length > 20) chatHistory.shift();
+      updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
+      hideThinking();
+      await typeBotMessage(reply);
     } catch (error) {
       console.error(`${availableAI.name} error:`, error.message);
       hideThinking();
@@ -403,8 +414,8 @@ async function sendMessage() {
         availableAI = nextComplexAI;
         try {
           reply = await availableAI.fetch(promptWithDirective);
-          chatHistory.push({ role: 'ai', message: reply });
-          if (chatHistory.length > 5) chatHistory.shift();
+          chatHistory.push({ role: 'ai', message: reply, ai: availableAI.name });
+          if (chatHistory.length > 20) chatHistory.shift();
           updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
           hideThinking();
           await typeBotMessage(reply);
@@ -419,8 +430,8 @@ async function sendMessage() {
             model: 'gpt-3.5-turbo',
             messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: promptWithDirective }]
           });
-          chatHistory.push({ role: 'ai', message: reply });
-          if (chatHistory.length > 5) chatHistory.shift();
+          chatHistory.push({ role: 'ai', message: reply, ai: 'ChatGPT' });
+          if (chatHistory.length > 20) chatHistory.shift();
           updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
         } catch (fallbackError) {
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -429,8 +440,8 @@ async function sendMessage() {
               model: 'gpt-4o-mini',
               messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: promptWithDirective }]
             });
-            chatHistory.push({ role: 'ai', message: reply });
-            if (chatHistory.length > 5) chatHistory.shift();
+            chatHistory.push({ role: 'ai', message: reply, ai: 'ChatGPT' });
+            if (chatHistory.length > 20) chatHistory.shift();
             updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
           } catch (miniError) {
             throw new Error(`ChatGPT fallbacks failed: ${miniError.message}`);
@@ -573,7 +584,7 @@ function initializeEventListeners() {
 function displayVersion() {
   const versionElement = document.createElement('div');
   versionElement.className = 'version';
-  versionElement.textContent = 'Version 1.2.0'; // Updated to 1.2.0
+  versionElement.textContent = 'Version 1.2.0';
   document.querySelector('.chat-wrapper').appendChild(versionElement);
 }
 
