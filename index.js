@@ -11,9 +11,9 @@ let xAIApiKey = '';
 let geminiApiKey = '';
 let openrouterApiKey = '';
 
-// Initialize chat history
-let chatHistory = [];
-let thoughtHistory = [];
+// Initialize chat sessions
+let chatSessions = [{ history: [], thoughtHistory: [], id: Date.now() }];
+let currentSessionId = chatSessions[0].id;
 
 const endpoints = {
   grok: 'https://api.x.ai/v1/chat/completions',
@@ -23,7 +23,7 @@ const endpoints = {
   phi: 'http://127.0.0.1:11434/api/generate'
 };
 
-const defaultAi = 'qwen';
+const defaultAi = 'gemini';
 let availableAIs = [];
 let lastUsedAI = null;
 
@@ -212,18 +212,18 @@ async function checkAIAvailability() {
   }
 
   const aiList = [
-    ...(localAvailableAIs.includes('qwen') ? [{ name: 'Qwen', fetch: (prompt) => fetchAI(endpoints.qwen, '', 'qwen', 'POST', { model: "qwen3:4b", prompt: `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'qwen' }] : []),
-    ...(localAvailableAIs.includes('phi') ? [{ name: 'Phi', fetch: (prompt) => fetchAI(endpoints.phi, '', 'phi', 'POST', { model: "phi:latest", prompt: `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'phi' }] : []),
+    ...(localAvailableAIs.includes('qwen') ? [{ name: 'Qwen', fetch: (prompt) => fetchAI(endpoints.qwen, '', 'qwen', 'POST', { model: "qwen3:4b", prompt: `${prompt}\n\nContext: ${getCurrentSession().history.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'qwen' }] : []),
+    ...(localAvailableAIs.includes('phi') ? [{ name: 'Phi', fetch: (prompt) => fetchAI(endpoints.phi, '', 'phi', 'POST', { model: "phi:latest", prompt: `${prompt}\n\nContext: ${getCurrentSession().history.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}`, stream: false }), id: 'phi' }] : []),
     ...(localAvailableAIs.includes('grok') ? [{ name: 'Grok', fetch: (prompt) => fetchAI(endpoints.grok, xAIApiKey, 'grok-beta', 'POST', {
       model: 'grok-beta',
-      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }]
+      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${getCurrentSession().history.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }]
     }), model: 'grok-beta', id: 'grok' }] : []),
     ...(localAvailableAIs.includes('gemini') ? [{ name: 'Gemini', fetch: (prompt) => fetchAI(endpoints.gemini, geminiApiKey, 'gemini-2.0-flash', 'POST', {
-      contents: [{ parts: [{ text: "You are Luna, a super friendly helpful chatbot. You really care about this person. " + `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }] }]
+      contents: [{ parts: [{ text: "You are Luna, a super friendly helpful chatbot. You really care about this person. " + `${prompt}\n\nContext: ${getCurrentSession().history.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }] }]
     }, 'X-goog-api-key'), model: 'gemini-2.0-flash', id: 'gemini' }] : []),
     ...(localAvailableAIs.includes('chatgpt') ? [{ name: 'ChatGPT', fetch: (prompt) => fetchAI(endpoints.chatgpt, openAIApiKey, 'gpt-4o', 'POST', {
       model: 'gpt-4o',
-      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${chatHistory.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }]
+      messages: [{ role: 'system', content: "You are Luna, a super friendly helpful chatbot. You really care about this person." }, { role: 'user', content: `${prompt}\n\nContext: ${getCurrentSession().history.map(h => `[${h.ai}] ${h.role}: ${h.message}`).join('\n')}` }]
     }), model: 'gpt-4o', id: 'chatgpt' }] : [])
   ];
 
@@ -329,14 +329,19 @@ async function sendMessage() {
   const input = userInput.value.trim();
   if (!input || isTyping) return;
 
-  chatHistory.push({ role: 'user', message: input, ai: 'user' });
-  if (chatHistory.length > 20) chatHistory.shift();
+  const currentSession = getCurrentSession();
+  currentSession.history.push({ role: 'user', message: input, ai: 'user' });
+  if (currentSession.history.length > 20) currentSession.history.shift();
   appendMessage('user', input);
   userInput.value = '';
   showThinking();
+  isTyping = true;
+  updateActionButton();
 
   if (!openAIApiKey && !xAIApiKey && !geminiApiKey && !openrouterApiKey) {
     hideThinking();
+    isTyping = false;
+    updateActionButton();
     appendMessage('bot', 'No AI available', false, true);
     updateAIStatus();
     return;
@@ -346,6 +351,8 @@ async function sendMessage() {
     let result = await checkAIAvailability();
     if (!result || !result.ai) {
       hideThinking();
+      isTyping = false;
+      updateActionButton();
       appendMessage('bot', 'No AI available', false, true);
       updateAIStatus();
       return;
@@ -359,8 +366,8 @@ async function sendMessage() {
 
     let reply;
     const startTime = Date.now();
-    const lastUserMessage = chatHistory.filter(h => h.role === 'user').pop()?.message || '';
-    const promptWithDirective = `Provide a single, complete response strictly addressing the user's most recent request (${lastUserMessage}) without self-identification (e.g., [Luna] or Luna:), greetings, or obvious statements. User chats in the context are to guide the AI to remain coherent and focused on the user's intended task. AI chats are to help the AI avoid repetition, except to provide a summary when appropriate. You are a super friendly. Available AIs are: ${aiList.map(ai => ai.name).join(', ')}. If unqualified, unable to respond directly, or response is empty, pass the query to another AI to finish by logging the reason to the console and responding with '[PASS]'. Question: ${input}`;
+    const lastUserMessage = currentSession.history.filter(h => h.role === 'user').pop()?.message || '';
+    const promptWithDirective = `Provide a single, complete response strictly addressing the user's most recent request (${lastUserMessage}) with a warm, friendly, and caring tone, as if you’re a supportive friend. Avoid introducing new topics, self-identification (e.g., [Luna] or Luna:), greetings, or obvious statements. User chats in the context guide you to remain coherent and focused on the user's intended task. AI chats help avoid repetition, except for a summary when appropriate. Focus only on the requested content. You are Luna, a super friendly and caring chatbot who deeply values this person's needs and feelings. Available AIs are: ${aiList.map(ai => ai.name).join(', ')}. If unqualified, unable to respond directly, or response is empty, pass by logging the reason to the console and responding with '[PASS]'. Question: ${input}`;
     try {
       reply = await availableAI.fetch(promptWithDirective);
       console.log(`Response from ${availableAI.name}:`, reply);
@@ -397,24 +404,30 @@ async function sendMessage() {
             } else {
               appendMessage('bot', 'Unable to generate a response after multiple attempts');
               hideThinking();
+              isTyping = false;
+              updateActionButton();
               return;
             }
           }
         } else {
           appendMessage('bot', 'Unable to generate a response');
           hideThinking();
+          isTyping = false;
+          updateActionButton();
           return;
         }
       }
 
-      chatHistory.push({ role: 'ai', message: reply, ai: availableAI.name });
-      if (chatHistory.length > 20) chatHistory.shift();
+      currentSession.history.push({ role: 'ai', message: reply, ai: availableAI.name });
+      if (currentSession.history.length > 20) currentSession.history.shift();
       updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
       hideThinking();
       await typeBotMessage(reply.trim());
     } catch (error) {
       console.error(`${availableAI.name} error:`, error.message);
       hideThinking();
+      isTyping = false;
+      updateActionButton();
       if (error.name === 'AbortError' && nextComplexAI) {
         console.log(`[Pass] ${availableAI.name} passed to ${nextComplexAI.name} due to timeout`);
         appendMessage('bot', `[${availableAI.name}] passed this question to [${nextComplexAI.name}]`);
@@ -424,8 +437,8 @@ async function sendMessage() {
           reply = await availableAI.fetch(promptWithDirective);
           const passEndTime = Date.now();
           addThoughtTime((passEndTime - passStartTime) / 1000, availableAI.name);
-          chatHistory.push({ role: 'ai', message: reply, ai: availableAI.name });
-          if (chatHistory.length > 20) chatHistory.shift();
+          currentSession.history.push({ role: 'ai', message: reply, ai: availableAI.name });
+          if (currentSession.history.length > 20) currentSession.history.shift();
           updateAIStatus(availableAI.id, currentAvailableAIs, 'mostRecent');
           hideThinking();
           await typeBotMessage(reply.trim());
@@ -443,8 +456,8 @@ async function sendMessage() {
           });
           const passEndTime = Date.now();
           addThoughtTime((passEndTime - passStartTime) / 1000, 'ChatGPT');
-          chatHistory.push({ role: 'ai', message: reply, ai: 'ChatGPT' });
-          if (chatHistory.length > 20) chatHistory.shift();
+          currentSession.history.push({ role: 'ai', message: reply, ai: 'ChatGPT' });
+          if (currentSession.history.length > 20) currentSession.history.shift();
           updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
         } catch (fallbackError) {
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -456,8 +469,8 @@ async function sendMessage() {
             });
             const passEndTime = Date.now();
             addThoughtTime((passEndTime - passStartTime) / 1000, 'ChatGPT');
-            chatHistory.push({ role: 'ai', message: reply, ai: 'ChatGPT' });
-            if (chatHistory.length > 20) chatHistory.shift();
+            currentSession.history.push({ role: 'ai', message: reply, ai: 'ChatGPT' });
+            if (currentSession.history.length > 20) currentSession.history.shift();
             updateAIStatus('chatgpt', currentAvailableAIs, 'mostRecent');
           } catch (miniError) {
             throw new Error(`ChatGPT fallbacks failed: ${miniError.message}`);
@@ -472,6 +485,8 @@ async function sendMessage() {
   } catch (error) {
     console.error('SendMessage error:', error.message);
     hideThinking();
+    isTyping = false;
+    updateActionButton();
     stopTyping();
     appendMessage('bot', 'No AI available', false, true);
     updateAIStatus();
@@ -531,14 +546,18 @@ function appendMessage(role, text, isThinking = false, isError = false) {
 }
 
 function addThoughtTime(thoughtTime, aiName) {
-  thoughtHistory.push({ time: thoughtTime.toFixed(2), ai: aiName, timestamp: new Date().toLocaleTimeString() });
-  if (thoughtHistory.length > 20) thoughtHistory.shift();
-
-  const lastThought = thoughtHistory[thoughtHistory.length - 1];
+  const currentSession = getCurrentSession();
+  currentSession.thoughtHistory.push({ time: Math.round(thoughtTime * 10) / 10, ai: aiName, timestamp: new Date().toLocaleTimeString('en-US', { 
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true // Use false for 24-hour format, true for 12-hour format
+  }).split(' ')[0] });
+  if (currentSession.thoughtHistory.length > 20) currentSession.thoughtHistory.shift();
+  const lastThought = currentSession.thoughtHistory[currentSession.thoughtHistory.length - 1];
   if (lastThought) {
     const thoughtMsg = document.createElement('div');
     thoughtMsg.classList.add('message', 'bot', 'thought-time');
-    thoughtMsg.textContent = `[${lastThought.timestamp}] ${lastThought.ai} thought for ${lastThought.time} seconds`;
+    thoughtMsg.textContent = `${lastThought.timestamp} - ${lastThought.ai} thought for ${lastThought.time}s`;
     chatContainer.appendChild(thoughtMsg);
     scrollToBottom();
   }
@@ -614,6 +633,8 @@ function initializeEventListeners() {
   }
   const scrollButton = document.getElementById('scroll-to-bottom');
   if (scrollButton) scrollButton.addEventListener('click', scrollToBottom);
+  const newChatButton = document.getElementById('new-chat-button');
+  if (newChatButton) newChatButton.addEventListener('click', createNewChat);
 }
 
 function displayVersion() {
@@ -636,26 +657,71 @@ function updateDynamicPosition() {
 
   const inputContainerRect = inputContainer.getBoundingClientRect();
   const buttonBottom = window.innerHeight - inputContainerRect.top + 10;
-  document.documentElement.style.setProperty('--dynamic-button-bottom', `${buttonBottom}px`);
+  document.documentElement.style.setProperty('--input-container-height', `${inputContainerRect.height}px`);
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+function createNewChat() {
+  const newSession = { history: [], thoughtHistory: [], id: Date.now() };
+  chatSessions.push(newSession);
+  currentSessionId = newSession.id;
+  chatContainer.innerHTML = '';
+  appendMessage("bot", "I'm Luna. How can I help?");
+  updateChatList();
+}
+
+function updateChatList() {
+  const chatList = document.getElementById('chat-list');
+  if (!chatList) return;
+  chatList.innerHTML = '';
+  chatSessions.forEach(session => {
+    const chatItem = document.createElement('div');
+    chatItem.className = 'chat-item';
+    chatItem.textContent = `Chat ${new Date(session.id).toLocaleTimeString().split(' ')[0]}`;
+    chatItem.dataset.sessionId = session.id;
+    if (session.id === currentSessionId) chatItem.classList.add('active');
+    chatItem.addEventListener('click', () => switchChat(session.id));
+    chatList.appendChild(chatItem);
+  });
+}
+
+function getCurrentSession() {
+  return chatSessions.find(session => session.id === currentSessionId) || chatSessions[0];
+}
+
+function switchChat(sessionId) {
+  const session = chatSessions.find(s => s.id === sessionId);
+  if (session && session.id !== currentSessionId) {
+    currentSessionId = session.id;
+    chatContainer.innerHTML = '';
+    session.history.forEach(msg => appendMessage(msg.role, msg.message));
+    session.thoughtHistory.forEach(thought => {
+      const thoughtMsg = document.createElement('div');
+      thoughtMsg.classList.add('message', 'bot', 'thought-time');
+      thoughtMsg.textContent = `${thought.timestamp} - ${thought.ai} thought for ${thought.time}s`;
+      chatContainer.appendChild(thoughtMsg);
+    });
+    updateChatList();
+    scrollToBottom();
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
   console.log('DOM loaded, appending initial message');
   appendMessage("bot", "I'm Luna. How can I help?");
   displayVersion();
+  updateChatList();
 });
 
 window.addEventListener('load', async () => {
   console.log('Window loaded, initializing');
   await loadApiKeys();
   updateAIStatus();
-  updateAIStatus('qwen', ['qwen'], 'mostRecent');
+  updateAIStatus('gemini', ['gemini'], 'mostRecent');
 
   initializeDarkMode();
   initializeEventListeners();
   chatContainer.addEventListener('scroll', debounce(updateScrollButton, 100));
+  window.addEventListener('resize', debounce(updateDynamicPosition, 100));
   updateScrollButton();
   updateDynamicPosition();
 });
-
-window.addEventListener('resize', debounce(updateDynamicPosition, 100));
