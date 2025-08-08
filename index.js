@@ -550,7 +550,7 @@ function addThoughtTime(thoughtTime, aiName) {
   currentSession.thoughtHistory.push({ time: Math.round(thoughtTime * 10) / 10, ai: aiName, timestamp: new Date().toLocaleTimeString('en-US', { 
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true // Use false for 24-hour format, true for 12-hour format
+    hour12: true
   }).split(' ')[0] });
   if (currentSession.thoughtHistory.length > 20) currentSession.thoughtHistory.shift();
   const lastThought = currentSession.thoughtHistory[currentSession.thoughtHistory.length - 1];
@@ -676,7 +676,11 @@ function updateChatList() {
   chatSessions.forEach(session => {
     const chatItem = document.createElement('div');
     chatItem.className = 'chat-item';
-    chatItem.textContent = `Chat ${new Date(session.id).toLocaleTimeString().split(' ')[0]}`;
+    chatItem.textContent = `Chat ${new Date(session.id).toLocaleTimeString('en-US', { 
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).split(' ')[0]}`;
     chatItem.dataset.sessionId = session.id;
     if (session.id === currentSessionId) chatItem.classList.add('active');
     chatItem.addEventListener('click', () => switchChat(session.id));
