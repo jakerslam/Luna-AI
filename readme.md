@@ -2,13 +2,22 @@ Luna AI Chat
 A friendly AI chatbot application that integrates multiple AI models (Qwen, Grok, Gemini, and ChatGPT) to provide interactive responses. Built for local development and testing, this project leverages browser-based JavaScript with API integrations.
 Features
 
-Youtube demo: https://youtu.be/uzDCUoM4ark
-
 Multi-AI support with Qwen (default), Grok, Gemini, and ChatGPT.
 Real-time chat interface with typing animation.
 Dark/light mode toggle.
 Status indicators for each AI's availability.
 Simple server setup for local hosting.
+
+# Development Environment
+Javascript, html, css - will refactor into react
+
+[Software Demo Video](https://youtu.be/uzDCUoM4ark)
+
+# Future Work
+- AIs will talk to eachother
+- Finish side bar
+- Save chats locally or integrate into firebase
+- Locally host default AI
 
 Prerequisites
 
