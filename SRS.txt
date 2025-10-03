@@ -1,0 +1,22 @@
+SRS for Luna AI Chat
+--------------------
+Date: August 10, 2025
+Purpose: A multi-AI chat interface with dynamic session management.
+Features:
+- Fixed 100px sidebar on the left side of the viewport, floating and always visible.
+- 30px "New Chat" button in the sidebar to create new chat sessions.
+- Chat titles displayed as "New Chat" in the sidebar list.
+- Support for multiple AI models (Grok, Gemini, ChatGPT, Qwen, Phi) with status indicators.
+- Preserve existing chat layout (constrained width: min(800px, 95vw), full height).
+- Responsive design for mobile (below 640px).
+- Light/dark mode theming with consistent styling.
+- Thinking indicators and scroll-to-bottom button functionality.
+Non-Functional Requirements:
+- Load time < 2 seconds.
+- Smooth transitions for theme changes (0.3s ease).
+- Sidebar and button styling match input background (--input-bg) and bot text color (--bot-text).
+
+
+Unimplimented:
+- Ability to add files: A paperclip icon and script to give it to the ai
+- AI intercommunication

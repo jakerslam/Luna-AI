@@ -2,6 +2,8 @@ Luna AI Chat
 A friendly AI chatbot application that integrates multiple AI models (Qwen, Grok, Gemini, and ChatGPT) to provide interactive responses. Built for local development and testing, this project leverages browser-based JavaScript with API integrations.
 Features
 
+Youtube demo: https://youtu.be/uzDCUoM4ark
+
 Multi-AI support with Qwen (default), Grok, Gemini, and ChatGPT.
 Real-time chat interface with typing animation.
 Dark/light mode toggle.
@@ -22,7 +24,8 @@ Python 3 for the local server.
 
 Installation
 
-Clone the repository:git clone <your-repo-url>
+Clone the repository: 
+git clone https://github.com/jakerslam/Luna-AI
 cd Luna-AI
 
 
@@ -58,5 +61,3 @@ Grok and ChatGPT may fail if API keys are invalid or quotas are exceeded.
 
 Contributing
 Feel free to fork and submit pull requests. Report issues on the repository.
-License
-MIT License (or specify your preferred license).

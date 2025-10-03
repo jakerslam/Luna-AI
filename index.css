@@ -194,23 +194,23 @@ input:not(:checked) + .slider::after {
 
 /* Sidebar */
 .sidebar {
-    width: var(--sidebar-width);
-    background: var(--input-bg);
+    width: 200px;
+    background: gray;
+    opacity: 30%;
     border-right: 1px solid var(--input-border);
-    padding: 10px 0;
+    padding: 10px;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    color: var(--bot-text);
-    flex-shrink: 0; /* Prevent sidebar from shrinking */
-    position: relative; /* Ensure it stays in flow */
-    float: left;
+    position: fixed; /* Float to the left side */
+    top: 0;
+    left: 0;
+    height: 100vh; /* Full height */
+    z-index: 100; /* Ensure it stays above other content */
 }
 
 #new-chat-button {
-    width: 80%;
-    padding: 10px;
+    width: 30px; /* Shrunk to 30px as requested */
+    height: 30px;
+    padding: 0;
     background: var(--button-bg);
     color: var(--button-text);
     border: none;
@@ -218,7 +218,10 @@ input:not(:checked) + .slider::after {
     cursor: pointer;
     transition: background 0.3s;
     font-size: 12px;
-    margin: 0 auto; /* Center horizontally */
+    margin: 5px auto; /* Center horizontally with small margin */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 #new-chat-button:hover {
@@ -250,6 +253,7 @@ input:not(:checked) + .slider::after {
     background: var(--user-bg);
     color: var(--user-text);
 }
+
 
 /* Chat Box Area */
 #chat-container {
