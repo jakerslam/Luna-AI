@@ -1,0 +1,5 @@
+- [ ] Finish sidebar UI
+- [ ] AI title generate for sidebar
+- [ ] Add backend to sidebar conversations
+- [ ] Facilitate AI cross talk
+- [ ] Enable user to enter own API

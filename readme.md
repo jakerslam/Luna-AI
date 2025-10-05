@@ -14,10 +14,7 @@ Javascript, html, css - will refactor into react
 [Software Demo Video](https://youtu.be/uzDCUoM4ark)
 
 # Future Work
-- AIs will talk to eachother
-- Finish side bar
-- Save chats locally or integrate into firebase
-- Locally host default AI
+[Backlog] (./backlog.md)
 
 Prerequisites
 
