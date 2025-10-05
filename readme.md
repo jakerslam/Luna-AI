@@ -14,7 +14,7 @@ Javascript, html, css - will refactor into react
 [Software Demo Video](https://youtu.be/uzDCUoM4ark)
 
 # Future Work
-[Backlog] ("./backlog.md")
+[Backlog](./backlog.md)
 
 Prerequisites
 
