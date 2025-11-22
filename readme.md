@@ -1,69 +1,81 @@
-Luna AI Chat
-A friendly AI chatbot application that integrates multiple AI models (Qwen, Grok, Gemini, and ChatGPT) to provide interactive responses. Built for local development and testing, this project leverages browser-based JavaScript with API integrations.
-Features
+# Overview
 
-Multi-AI support with Qwen (default), Grok, Gemini, and ChatGPT.
-Real-time chat interface with typing animation.
-Dark/light mode toggle.
-Status indicators for each AI's availability.
-Simple server setup for local hosting.
+Luna AI is a browser-based chatbot interface that connects to multiple large language models (Qwen via OpenRouter, Grok, Gemini, and ChatGPT) through their HTTP APIs. I built it to deepen my experience with **JavaScript**, especially around working with asynchronous code (`fetch`, `async/await`), integrating third-party APIs, and updating the DOM in response to streaming data from different backends.
+
+The app focuses on frontend JavaScript only (no framework yet) so I could really see what is happening under the hood: how to structure functions, manage state in plain JS, handle errors from remote APIs, and coordinate multiple model options in a single UI. The interface includes a dark/light theme toggle, simple availability indicators for each AI, and a real-time chat area with a typing effect so it feels like a live assistant.
+
+The purpose of this software is to practice **real-world API integration** and **client-side application structure** in JavaScript. I wanted something that feels like an actual portfolio project: a small but realistic multi-model AI client where I could experiment with language features (callback vs `async/await`, object literals for configuration, event listeners, etc.) and learn how to keep the code organized as the feature set grows.
+
+[Software Demo Video](https://www.youtube.com/watch?v=XXXXXXXXXXX)
+
+> _(Replace the above URL with your actual Luna AI demo link.)_
+
+---
 
 # Development Environment
-Javascript, html, css - will refactor into react
 
-[Software Demo Video](https://youtu.be/uzDCUoM4ark)
+I developed Luna AI using the following tools:
+
+- **Editor:** VS Code
+- **Runtime / Hosting:** Local static server using `python3 -m http.server 8000`
+- **Version Control:** Git & GitHub (repository: `jakerslam/Luna-AI`)
+- **Browser:** Chrome/Chromium for testing, DevTools for debugging
+
+**Programming language & libraries:**
+
+- **JavaScript (vanilla, browser-based)** for all application logic  
+  - DOM manipulation (`document.querySelector`, event listeners)  
+  - Asynchronous operations with `fetch` and `async/await`  
+  - Error handling with `try/catch`
+- **HTML & CSS** for layout and styling (chat container, message bubbles, dark/light theme)
+- **No front-end framework yet** (React is planned as a future refactor)
+- API integrations:
+  - OpenRouter (Qwen)
+  - xAI (Grok)
+  - Google Generative Language API (Gemini)
+  - OpenAI (ChatGPT)
+- API keys are loaded from a local `apikey.json` file during development.
+
+---
+
+# Useful Websites
+
+These are some of the resources I used during this project:
+
+- [MDN Web Docs – JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+- [MDN – Using Fetch](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
+- [MDN – Working with JSON](https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Objects/JSON)
+- [OpenAI API Reference](https://platform.openai.com/docs/api-reference)
+- [OpenRouter Documentation](https://openrouter.ai/docs)
+- [Google AI Studio / Gemini API Docs](https://ai.google.dev/)
+- [xAI Grok API Docs](https://docs.x.ai/) _(for Grok integration)_
+
+---
 
 # Future Work
-[Backlog](./backlog.md)
 
-Prerequisites
+There are several improvements I plan to make to Luna AI:
 
-A modern web browser (Chrome, Firefox, etc.).
-API keys for:
-OpenRouter (Qwen)
-xAI (Grok)
-Google Generative Language (Gemini)
-OpenAI (ChatGPT)
+- **Richer README & documentation**  
+  - Expand setup instructions  
+  - Add architecture diagrams and clearer API usage notes  
 
+- **Refactor to a React front end**  
+  - Componentize the chat window, model selector, and status indicators  
+  - Improve state management and routing for future features
 
-Python 3 for the local server.
+- **Persistent chat history**  
+  - Store conversations in `localStorage` or a backend database  
+  - Allow users to reload the page without losing previous messages
 
-Installation
+- **Backend service for API keys**  
+  - Move API keys out of the frontend and into a simple backend proxy  
+  - Improve security and support multiple users safely
 
-Clone the repository: 
-git clone https://github.com/jakerslam/Luna-AI
-cd Luna-AI
+- **Better error and status handling**  
+  - More detailed messages when a model is down, misconfigured, or rate-limited  
+  - Retry logic and clearer feedback in the UI
 
-
-Create an apikey.json file with your API keys:{
-  "openAIApiKey": "your-openai-key",
-  "xAIApiKey": "your-xai-key",
-  "geminiApiKey": "your-gemini-key",
-  "openrouterApiKey": "your-openrouter-key"
-}
-
-
-Start the local server:python3 -m http.server 8000
-
-
-Open http://localhost:8000 in your browser.
-
-Usage
-
-Type a message and press Enter or click the send button.
-Toggle dark/light mode using the switch.
-Check AI status boxes for availability (green = online, red = offline).
-
-Development
-
-Edit index.js for core logic.
-Style adjustments in the HTML/CSS (e.g., style.css).
-Debug via browser DevTools (F12).
-
-Known Issues
-
-Gemini requires a server-side proxy due to CORS restrictions.
-Grok and ChatGPT may fail if API keys are invalid or quotas are exceeded.
-
-Contributing
-Feel free to fork and submit pull requests. Report issues on the repository.
+- **Model comparison features**  
+  - Side-by-side responses from multiple models to compare outputs  
+  - Per-model timers or cost/latency metrics
